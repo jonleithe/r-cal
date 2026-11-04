@@ -322,26 +322,31 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
                 static_cast<unsigned>(parseLong(value, key, 2, 20));
             else if (key == "show_grid") newOptions.showGrid = parseBool(value, key);
             else if (key == "time_info") newOptions.timeInfo = value;
-            else if (key == "holiday_country") {
+
+            else if (key == "holiday_country"){
                 const std::string country = lower(value);
                 if (country == "no") newOptions.holidayCountry = "NO";
                 else if (country == "none") newOptions.holidayCountry = "none";
                 else throw std::runtime_error("unsupported holiday country '" + value + "'");
             }
-            else if (key == "month_names") {
+
+            else if (key == "month_names"){
                 const auto names = split(value, ',');
                 if (names.size() != 12) throw std::runtime_error("month_names needs 12 values");
                 std::copy(names.begin(), names.end(), newOptions.monthNames.begin());
-            } else if (key == "day_names") {
+            }
+            else if (key == "day_names"){
                 const auto names = split(value, ',');
                 if (names.size() != 7) throw std::runtime_error("day_names needs 7 values");
                 std::copy(names.begin(), names.end(), newOptions.dayNames.begin());
-            } else if (key == "label.year") newOptions.yearLabel = value;
+            }
+            else if (key == "label.year") newOptions.yearLabel = value;
             else if (key == "label.month") newOptions.monthLabel = value;
             else if (key == "label.week") newOptions.weekLabel = value;
             else if (key == "label.date") newOptions.dateLabel = value;
             else if (key == "label.day") newOptions.dayLabel = value;
             else if (key == "label.time_info") newOptions.timeInfoLabel = value;
+            else if (key == "label.holiday_info") newOptions.holidayInfoPrefix = value;
             else if (key == "color.label") newColors.label = parseStyle(value);
             else if (key == "color.year") newColors.year = parseStyle(value);
             else if (key == "color.month") newColors.month = parseStyle(value);
@@ -370,6 +375,12 @@ const HeaderOptions& RCalHeaderFramework::options() const noexcept { return opti
 const HeaderColors& RCalHeaderFramework::colors() const noexcept { return colors_; }
 const std::vector<TimelineDay>& RCalHeaderFramework::timeline() const noexcept { return timeline_; }
 const Date& RCalHeaderFramework::selectedDate() const noexcept { return selectedDate_; }
+const std::string& RCalHeaderFramework::selectedHolidayName() const noexcept {
+    static const std::string empty;
+    if (selectedDayIndex_ >= timeline_.size()) return empty;
+    const auto& selected = timeline_[selectedDayIndex_];
+    return sameDate(selected.date, selectedDate_) ? selected.holidayName : empty;
+}
 std::size_t RCalHeaderFramework::firstVisibleDay() const noexcept { return firstVisibleDay_; }
 std::size_t RCalHeaderFramework::visibleDayCount() const noexcept { return visibleDayCount_; }
 
@@ -480,8 +491,14 @@ void RCalHeaderFramework::moveSelection(int days) {
     validateDate(moved);
 
     if (!viewportInitialized_ || visibleDayCount_ == 0) {
-        selectedDate_ = moved;
-        options_.startDate = moved;
+        const long long candidate = static_cast<long long>(selectedDayIndex_) + days;
+        if (candidate >= 0 && candidate < static_cast<long long>(timeline_.size())) {
+            selectedDayIndex_ = static_cast<std::size_t>(candidate);
+            selectedDate_ = moved;
+        } else {
+            options_.startDate = moved;
+            rebuildTimeline();
+        }
         return;
     }
 
@@ -658,6 +675,16 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
             for (int row = 3; row < 6; ++row)
                 put(window, top + row, separator, "|", styles.attributes(colors_.grid));
         }
+    }
+
+    const std::string& selectedHoliday = selectedHolidayName();
+    if (!selectedHoliday.empty()) {
+        const int available = std::max(0, windowWidth - firstCell);
+        put(window, top + 5, firstCell, std::string(static_cast<std::size_t>(available), ' '),
+            styles.attributes(colors_.timeInfo));
+        const std::string explanation = options_.holidayInfoPrefix.empty()
+            ? selectedHoliday : options_.holidayInfoPrefix + ": " + selectedHoliday;
+        put(window, top + 5, firstCell, explanation, styles.attributes(colors_.holiday));
     }
     wattrset(window, A_NORMAL);
     return std::min(6, windowHeight - top);

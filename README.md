@@ -55,6 +55,10 @@ year, along with New Year's Day, 1 May, 17 May, and the two Christmas days.
 Set `holiday_country=none` to disable national-holiday highlighting. Ordinary
 Sundays remain covered by the weekend style.
 
+When a holiday is selected, the Info row displays its full Norwegian name, for
+example `Helligdag: Kristi himmelfartsdag`. Configure or remove the prefix with
+`label.holiday_info`.
+
 The implemented dates follow Norway's official
 [Public Holiday Act](https://lovdata.no/dokument/NL/lov/1995-02-24-12/%C2%A72)
 and the [Act relating to 1 and 17 May](https://lovdata.no/dokument/NL/lov/1947-04-26-1).

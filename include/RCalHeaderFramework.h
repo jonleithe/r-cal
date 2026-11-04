@@ -73,6 +73,7 @@ struct HeaderOptions{
     std::string dateLabel       = "Date";
     std::string dayLabel        = "Day";
     std::string timeInfoLabel   = "Info";
+    std::string holidayInfoPrefix = "Helligdag";
 };
 
 
@@ -107,6 +108,7 @@ public:
     const HeaderColors& colors() const noexcept;
     const std::vector<TimelineDay>& timeline() const noexcept;
     const Date& selectedDate() const noexcept;
+    const std::string& selectedHolidayName() const noexcept;
     std::size_t firstVisibleDay() const noexcept;
     std::size_t visibleDayCount() const noexcept;
 

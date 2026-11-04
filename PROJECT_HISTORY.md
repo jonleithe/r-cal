@@ -5,6 +5,12 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Holiday explanations added
+
+- The Info row now shows the selected holiday's full Norwegian name.
+- Added a configurable `label.holiday_info` prefix and enabled the process
+  locale so Norwegian characters render correctly in curses terminals.
+
 ### Norwegian public holidays added
 
 - Added automatic calculation and highlighting of Norway's fixed and

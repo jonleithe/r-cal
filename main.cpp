@@ -1,6 +1,7 @@
 #include "RCalHeaderFramework.h"
 
 #include <curses.h>
+#include <clocale>
 #include <exception>
 #include <iostream>
 
@@ -8,6 +9,7 @@ int main(int argc, char** argv)
 {
 
     try{
+        std::setlocale(LC_ALL, "");
         const std::string config = argc > 1 ? argv[1] : "config/rcal.conf.example";
         auto header = rcal::RCalHeaderFramework::fromConfigFile(config);
 

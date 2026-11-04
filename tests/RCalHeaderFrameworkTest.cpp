@@ -36,6 +36,11 @@ int main() {
     assert(holidays.timeline()[50].holidayName == "Grunnlovsdagen");
     assert(holidays.timeline()[52].holidayName == "Første pinsedag");
     assert(holidays.timeline()[53].holidayName == "Andre pinsedag");
+    assert(holidays.selectedHolidayName() == "Skjærtorsdag");
+    holidays.moveSelection(1);
+    assert(holidays.selectedHolidayName() == "Langfredag");
+    holidays.moveSelection(1);
+    assert(holidays.selectedHolidayName().empty());
     holidayOptions.holidayCountry = "none";
     holidays.setOptions(holidayOptions);
     assert(holidays.timeline()[0].holidayName.empty());
@@ -46,6 +51,7 @@ int main() {
     assert(configured.options().rebuildThresholdDays == 30);
     assert(configured.colors().weekend.foreground == "red");
     assert(configured.options().holidayCountry == "NO");
+    assert(configured.options().holidayInfoPrefix == "Helligdag");
     assert(configured.colors().holiday.bold);
     assert(configured.colors().currentDay.foreground == "black");
     assert(configured.colors().currentDay.background == "yellow");

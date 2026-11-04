@@ -8,8 +8,8 @@ time_info=
 holiday_country=NO
 
 # Localization. Lists require 12 months and 7 days (Monday first).
-month_names=Januar,February,Mars,April,May,June,July,August,September,October,November,December
-day_names=Mon,Tue,Ons,Thu,Fri,Sat,Sun
+month_names=Januar,February,March,April,May,June,July,August,September,October,November,December
+day_names=Mon,Tue,Wed,Thu,Fri,Sat,Sun
 
 label.year=Year
 label.month=Month
@@ -17,6 +17,7 @@ label.week=Week
 label.date=Date
 label.day=Day
 label.time_info=Info
+label.holiday_info=Helligdag
 
 # Syntax: foreground,background[,bold][,underline][,reverse]
 # Use basic color names or numeric IDs supported by the terminal.
