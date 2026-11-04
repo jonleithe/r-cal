@@ -1,0 +1,371 @@
+#include "RCalHeaderFramework.h"
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cerrno>
+#include <climits>
+#include <cstdlib>
+#include <fstream>
+#include <map>
+#include <sstream>
+#include <stdexcept>
+#include <utility>
+
+#include <curses.h>
+
+namespace rcal {
+namespace {
+
+std::string trim(std::string value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return {};
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
+}
+
+std::string lower(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return value;
+}
+
+std::vector<std::string> split(const std::string& value, char delimiter) {
+    std::vector<std::string> result;
+    std::istringstream input(value);
+    std::string item;
+    while (std::getline(input, item, delimiter)) result.push_back(trim(item));
+    return result;
+}
+
+long parseLong(const std::string& value, const std::string& key, long minimum,
+               long maximum) {
+    char* end = nullptr;
+    errno = 0;
+    const long number = std::strtol(value.c_str(), &end, 10);
+    if (errno != 0 || end == value.c_str() || *end != '\0' || number < minimum ||
+        number > maximum) {
+        throw std::runtime_error("invalid value for '" + key + "': " + value);
+    }
+    return number;
+}
+
+bool parseBool(const std::string& value, const std::string& key) {
+    const std::string normalized = lower(trim(value));
+    if (normalized == "true" || normalized == "yes" || normalized == "1") return true;
+    if (normalized == "false" || normalized == "no" || normalized == "0") return false;
+    throw std::runtime_error("invalid boolean for '" + key + "': " + value);
+}
+
+Date parseDate(const std::string& value) {
+    const auto parts = split(value, '-');
+    if (parts.size() != 3) throw std::runtime_error("start_date must be YYYY-MM-DD");
+    return {
+        static_cast<int>(parseLong(parts[0], "start_date year", 1, 9999)),
+        static_cast<unsigned>(parseLong(parts[1], "start_date month", 1, 12)),
+        static_cast<unsigned>(parseLong(parts[2], "start_date day", 1, 31))
+    };
+}
+
+bool leapYear(int year) {
+    return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+}
+
+unsigned daysInMonth(int year, unsigned month) {
+    static constexpr std::array<unsigned, 12> days{{
+        31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+    }};
+    return days.at(month - 1) + (month == 2 && leapYear(year) ? 1U : 0U);
+}
+
+void validateDate(const Date& date) {
+    if (date.year < 1 || date.year > 9999 || date.month < 1 || date.month > 12 ||
+        date.day < 1 || date.day > daysInMonth(date.year, date.month)) {
+        throw std::runtime_error("invalid calendar date");
+    }
+}
+
+long long daysFromCivil(int year, unsigned month, unsigned day) {
+    year -= month <= 2;
+    const int era = (year >= 0 ? year : year - 399) / 400;
+    const unsigned yearOfEra = static_cast<unsigned>(year - era * 400);
+    const unsigned dayOfYear =
+        (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1;
+    const unsigned dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 +
+                              dayOfYear;
+    return static_cast<long long>(era) * 146097 + dayOfEra - 719468;
+}
+
+Date civilFromDays(long long days) {
+    days += 719468;
+    const long long era = (days >= 0 ? days : days - 146096) / 146097;
+    const unsigned dayOfEra = static_cast<unsigned>(days - era * 146097);
+    const unsigned yearOfEra =
+        (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146096) / 365;
+    int year = static_cast<int>(yearOfEra) + static_cast<int>(era) * 400;
+    const unsigned dayOfYear = dayOfEra -
+        (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100);
+    const unsigned monthPart = (5 * dayOfYear + 2) / 153;
+    const unsigned day = dayOfYear - (153 * monthPart + 2) / 5 + 1;
+    const unsigned month = monthPart < 10 ? monthPart + 3 : monthPart - 9;
+    year += month <= 2;
+    return {year, month, day};
+}
+
+unsigned isoWeekday(long long days) {
+    long long weekday = (days + 3) % 7;
+    if (weekday < 0) weekday += 7;
+    return static_cast<unsigned>(weekday + 1);
+}
+
+unsigned ordinalDay(const Date& date) {
+    static constexpr std::array<unsigned, 12> offsets{{
+        0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334
+    }};
+    return offsets[date.month - 1] + date.day +
+           (date.month > 2 && leapYear(date.year) ? 1U : 0U);
+}
+
+unsigned isoWeeksInYear(int year) {
+    const unsigned jan1 = isoWeekday(daysFromCivil(year, 1, 1));
+    return jan1 == 4 || (jan1 == 3 && leapYear(year)) ? 53U : 52U;
+}
+
+unsigned isoWeek(const Date& date, unsigned weekday) {
+    int week = (static_cast<int>(ordinalDay(date)) - static_cast<int>(weekday) + 10) / 7;
+    if (week < 1) return isoWeeksInYear(date.year - 1);
+    if (week > static_cast<int>(isoWeeksInYear(date.year))) return 1;
+    return static_cast<unsigned>(week);
+}
+
+ColorStyle parseStyle(const std::string& value) {
+    const auto parts = split(value, ',');
+    ColorStyle style;
+    if (!parts.empty() && !parts[0].empty()) style.foreground = lower(parts[0]);
+    if (parts.size() > 1 && !parts[1].empty()) style.background = lower(parts[1]);
+    for (std::size_t i = 2; i < parts.size(); ++i) {
+        const std::string flag = lower(parts[i]);
+        if (flag == "bold") style.bold = true;
+        else if (flag == "underline") style.underline = true;
+        else if (flag == "reverse") style.reverse = true;
+        else if (!flag.empty()) throw std::runtime_error("unknown color attribute: " + flag);
+    }
+    return style;
+}
+
+short cursesColor(const std::string& name) {
+    static const std::map<std::string, short> names{{
+        {"default", -1}, {"black", COLOR_BLACK}, {"red", COLOR_RED},
+        {"green", COLOR_GREEN}, {"yellow", COLOR_YELLOW}, {"blue", COLOR_BLUE},
+        {"magenta", COLOR_MAGENTA}, {"cyan", COLOR_CYAN}, {"white", COLOR_WHITE}
+    }};
+    const auto found = names.find(lower(name));
+    if (found != names.end()) return found->second;
+    return static_cast<short>(parseLong(name, "color", 0, SHRT_MAX));
+}
+
+struct StyleRegistry {
+    short nextPair = 1;
+    std::map<std::pair<short, short>, short> pairs;
+
+    attr_t attributes(const ColorStyle& style) {
+        attr_t result = A_NORMAL;
+        if (style.bold) result |= A_BOLD;
+        if (style.underline) result |= A_UNDERLINE;
+        if (style.reverse) result |= A_REVERSE;
+        if (!has_colors()) return result;
+        const short foreground = cursesColor(style.foreground);
+        const short background = cursesColor(style.background);
+        const auto key = std::make_pair(foreground, background);
+        auto found = pairs.find(key);
+        if (found == pairs.end()) {
+            if (nextPair >= COLOR_PAIRS) return result;
+            init_pair(nextPair, foreground, background);
+            found = pairs.emplace(key, nextPair++).first;
+        }
+        return result | COLOR_PAIR(found->second);
+    }
+};
+
+std::string centered(std::string text, unsigned width) {
+    if (text.size() > width) text.resize(width);
+    const std::size_t left = (width - text.size()) / 2;
+    return std::string(left, ' ') + text + std::string(width - left - text.size(), ' ');
+}
+
+void put(WINDOW* window, int y, int x, const std::string& text, attr_t attributes) {
+    wattrset(window, attributes);
+    mvwaddnstr(window, y, x, text.c_str(), static_cast<int>(text.size()));
+}
+
+} // namespace
+
+RCalHeaderFramework::RCalHeaderFramework() { rebuildTimeline(); }
+
+RCalHeaderFramework::RCalHeaderFramework(HeaderOptions options)
+    : options_(std::move(options)) { rebuildTimeline(); }
+
+RCalHeaderFramework RCalHeaderFramework::fromConfigFile(const std::string& path) {
+    RCalHeaderFramework result;
+    result.loadConfigFile(path);
+    return result;
+}
+
+void RCalHeaderFramework::loadConfigFile(const std::string& path) {
+    std::ifstream input(path);
+    if (!input) throw std::runtime_error("cannot open config file: " + path);
+    HeaderOptions newOptions = options_;
+    HeaderColors newColors = colors_;
+    std::string line;
+    std::size_t lineNumber = 0;
+    while (std::getline(input, line)) {
+        ++lineNumber;
+        const std::string clean = trim(line);
+        if (clean.empty() || clean[0] == '#' || clean[0] == ';') continue;
+        const auto equals = clean.find('=');
+        if (equals == std::string::npos) {
+            throw std::runtime_error(path + ":" + std::to_string(lineNumber) +
+                                     ": expected key=value");
+        }
+        const std::string key = lower(trim(clean.substr(0, equals)));
+        const std::string value = trim(clean.substr(equals + 1));
+        try {
+            if (key == "start_date") newOptions.startDate = parseDate(value);
+            else if (key == "days") newOptions.dayCount =
+                static_cast<std::size_t>(parseLong(value, key, 1, 3660));
+            else if (key == "cell_width") newOptions.cellWidth =
+                static_cast<unsigned>(parseLong(value, key, 2, 20));
+            else if (key == "show_grid") newOptions.showGrid = parseBool(value, key);
+            else if (key == "time_info") newOptions.timeInfo = value;
+            else if (key == "month_names") {
+                const auto names = split(value, ',');
+                if (names.size() != 12) throw std::runtime_error("month_names needs 12 values");
+                std::copy(names.begin(), names.end(), newOptions.monthNames.begin());
+            } else if (key == "day_names") {
+                const auto names = split(value, ',');
+                if (names.size() != 7) throw std::runtime_error("day_names needs 7 values");
+                std::copy(names.begin(), names.end(), newOptions.dayNames.begin());
+            } else if (key == "label.year") newOptions.yearLabel = value;
+            else if (key == "label.month") newOptions.monthLabel = value;
+            else if (key == "label.week") newOptions.weekLabel = value;
+            else if (key == "label.date") newOptions.dateLabel = value;
+            else if (key == "label.day") newOptions.dayLabel = value;
+            else if (key == "label.time_info") newOptions.timeInfoLabel = value;
+            else if (key == "color.label") newColors.label = parseStyle(value);
+            else if (key == "color.year") newColors.year = parseStyle(value);
+            else if (key == "color.month") newColors.month = parseStyle(value);
+            else if (key == "color.week_number") newColors.weekNumber = parseStyle(value);
+            else if (key == "color.date") newColors.date = parseStyle(value);
+            else if (key == "color.day_name") newColors.dayName = parseStyle(value);
+            else if (key == "color.weekend") newColors.weekend = parseStyle(value);
+            else if (key == "color.time_info") newColors.timeInfo = parseStyle(value);
+            else if (key == "color.grid") newColors.grid = parseStyle(value);
+            else throw std::runtime_error("unknown setting '" + key + "'");
+        } catch (const std::exception& error) {
+            throw std::runtime_error(path + ":" + std::to_string(lineNumber) + ": " + error.what());
+        }
+    }
+    options_ = std::move(newOptions);
+    colors_ = std::move(newColors);
+    rebuildTimeline();
+}
+
+const HeaderOptions& RCalHeaderFramework::options() const noexcept { return options_; }
+const HeaderColors& RCalHeaderFramework::colors() const noexcept { return colors_; }
+const std::vector<TimelineDay>& RCalHeaderFramework::timeline() const noexcept { return timeline_; }
+
+void RCalHeaderFramework::setOptions(HeaderOptions options) {
+    options_ = std::move(options);
+    rebuildTimeline();
+}
+
+void RCalHeaderFramework::setColors(HeaderColors colors) { colors_ = std::move(colors); }
+
+void RCalHeaderFramework::rebuildTimeline() {
+    validateDate(options_.startDate);
+    if (options_.dayCount == 0) throw std::runtime_error("dayCount must be at least 1");
+    if (options_.cellWidth < 2) throw std::runtime_error("cellWidth must be at least 2");
+    timeline_.clear();
+    timeline_.reserve(options_.dayCount);
+    const long long first = daysFromCivil(options_.startDate.year, options_.startDate.month,
+                                          options_.startDate.day);
+    for (std::size_t offset = 0; offset < options_.dayCount; ++offset) {
+        const long long absolute = first + static_cast<long long>(offset);
+        const Date date = civilFromDays(absolute);
+        const unsigned weekday = isoWeekday(absolute);
+        timeline_.push_back({date, ordinalDay(date), isoWeek(date, weekday), weekday});
+    }
+}
+
+int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
+    if (!window) throw std::invalid_argument("render window must not be null");
+    if (has_colors()) { start_color(); use_default_colors(); }
+    StyleRegistry styles;
+    const unsigned width = options_.cellWidth;
+    const std::array<std::string, 6> labels{{
+        options_.yearLabel, options_.monthLabel, options_.weekLabel,
+        options_.dateLabel, options_.dayLabel, options_.timeInfoLabel
+    }};
+    std::size_t labelWidth = 1;
+    for (const auto& label : labels) labelWidth = std::max(labelWidth, label.size());
+    const int firstCell = left + static_cast<int>(labelWidth) + 1;
+
+    for (int row = 0; row < 6; ++row) {
+        put(window, top + row, left, labels[static_cast<std::size_t>(row)],
+            styles.attributes(colors_.label));
+        if (options_.showGrid)
+            put(window, top + row, firstCell - 1, "|", styles.attributes(colors_.grid));
+    }
+
+    const unsigned stride = width + (options_.showGrid ? 1U : 0U);
+    auto renderSpans = [&](int row, const std::vector<std::string>& values,
+                           const ColorStyle& style) {
+        std::size_t begin = 0;
+        while (begin < values.size()) {
+            std::size_t end = begin + 1;
+            while (end < values.size() && values[end] == values[begin]) ++end;
+            const unsigned spanWidth = static_cast<unsigned>((end - begin) * stride -
+                                       (options_.showGrid ? 1U : 0U));
+            const int x = firstCell + static_cast<int>(begin * stride);
+            put(window, top + row, x, centered(values[begin], spanWidth),
+                styles.attributes(style));
+            if (options_.showGrid)
+                put(window, top + row, x + static_cast<int>(spanWidth), "|",
+                    styles.attributes(colors_.grid));
+            begin = end;
+        }
+    };
+
+    std::vector<std::string> years;
+    std::vector<std::string> months;
+    std::vector<std::string> weeks;
+    years.reserve(timeline_.size());
+    months.reserve(timeline_.size());
+    weeks.reserve(timeline_.size());
+    for (const auto& day : timeline_) {
+        years.push_back(std::to_string(day.date.year));
+        months.push_back(options_.monthNames.at(day.date.month - 1));
+        weeks.push_back(std::to_string(day.isoWeek));
+    }
+    renderSpans(0, years, colors_.year);
+    renderSpans(1, months, colors_.month);
+    renderSpans(2, weeks, colors_.weekNumber);
+
+    for (std::size_t i = 0; i < timeline_.size(); ++i) {
+        const auto& day = timeline_[i];
+        const int x = firstCell + static_cast<int>(i * stride);
+        const ColorStyle& dayStyle = day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName;
+        put(window, top + 3, x, centered(std::to_string(day.date.day), width), styles.attributes(colors_.date));
+        put(window, top + 4, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));
+        put(window, top + 5, x, centered(options_.timeInfo, width), styles.attributes(colors_.timeInfo));
+        if (options_.showGrid) {
+            const int separator = x + static_cast<int>(width);
+            for (int row = 3; row < 6; ++row)
+                put(window, top + row, separator, "|", styles.attributes(colors_.grid));
+        }
+    }
+    wattrset(window, A_NORMAL);
+    return 6;
+}
+
+} // namespace rcal

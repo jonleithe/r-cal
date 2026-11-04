@@ -6,10 +6,9 @@ computer.
 
 ## Project status
 
-`r-cal` is a C and C++ project at the repository-bootstrap stage. The compiler,
-C and C++ language standards, build process, and test tooling have not been
-chosen yet. Do not assume specific tools or standards until they are documented
-here.
+`r-cal` is a C and C++ terminal-calendar project. Its initial timeline header is
+implemented in C++17, built with CMake, rendered with curses, and tested through
+CTest. C remains an enabled project language for future components.
 
 ## Source of truth
 
@@ -51,9 +50,23 @@ out of commits, or place them on a clearly named work-in-progress branch.
 
 ## Commands
 
-No setup, build, test, lint, or run commands are defined yet. The compiler,
-language standards, and build system are also still undecided. Replace this
-section with verified commands as soon as the implementation is introduced.
+Configure, build, and test from the repository root:
+
+```sh
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Run the curses demo from the repository root with:
+
+```sh
+./build/rcal_header_demo config/rcal.conf.example
+```
+
+The current code requires CMake 3.16 or newer, a C++17 compiler, and curses
+development headers and libraries. Build artifacts belong in `build/` and must
+not be committed.
 
 ## Keeping this file useful
 

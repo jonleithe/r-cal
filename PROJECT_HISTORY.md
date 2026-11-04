@@ -5,6 +5,15 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Configurable curses timeline header introduced
+
+- Reworked the initial header stub into a C++17 timeline model and curses
+  renderer with grouped year, month, and ISO-week rows.
+- Added independently configurable styles for labels, years, months, week
+  numbers, dates, day names, weekends, time information, and grid separators.
+- Added a key/value configuration format with localized month and day names,
+  an example program, CMake build, and calendar-boundary tests.
+
 ### C and C++ selected
 
 - The project will be implemented in C and C++.
