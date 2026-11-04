@@ -5,6 +5,15 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Buffered timeline navigation added
+
+- Added keyboard navigation by day and by visible page, with shortcuts to
+  return to today and quit.
+- The selected date starts centered in the viewport, with a 90-day buffer on
+  each side that rebuilds when fewer than 30 hidden days remain.
+- Added distinct current-day and selected-day styles plus resize-aware viewport
+  calculation.
+
 ### Step-by-step debugging configured
 
 - Added VS Code tasks for Debug configuration, building, and tests.

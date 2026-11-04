@@ -31,6 +31,22 @@ Colors use `foreground,background` syntax followed by optional `bold`,
 highlighted with `color.current_day`, and the cursor is hidden while the header
 is displayed.
 
+## Navigation
+
+The initially selected date is centered in the visible timeline. The framework
+keeps a 90-day buffer on both sides and rebuilds it when fewer than 30 hidden
+days remain. These values are configured with `buffer_days` and
+`rebuild_threshold_days`.
+
+- Left/Right or `h`/`l`: select the previous or next day.
+- Page Up/Page Down: move by one visible screen.
+- Home or `t`: return to today.
+- `q`, `Q`, or Escape: quit.
+
+Today remains highlighted with `color.current_day`; a different selected date
+uses `color.selected_day`. Resizing the terminal recalculates the number of
+visible days and keeps the selected date centered.
+
 ## Debugging in VS Code
 
 Install Microsoft's C/C++ extension, open the repository folder, set a

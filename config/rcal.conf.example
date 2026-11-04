@@ -1,6 +1,7 @@
 # Timeline range and layout
 start_date=today
-days=42
+buffer_days=90
+rebuild_threshold_days=30
 cell_width=4
 show_grid=true
 time_info=
@@ -26,5 +27,6 @@ color.date=white,default
 color.day_name=white,default
 color.weekend=red,default
 color.current_day=black,yellow,bold
+color.selected_day=white,blue,bold
 color.time_info=magenta,default
 color.grid=blue,default

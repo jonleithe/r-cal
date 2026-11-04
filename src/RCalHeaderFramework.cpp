@@ -155,6 +155,10 @@ bool sameDate(const Date& left, const Date& right) {
     return left.year == right.year && left.month == right.month && left.day == right.day;
 }
 
+Date addDays(const Date& date, long long days) {
+    return civilFromDays(daysFromCivil(date.year, date.month, date.day) + days);
+}
+
 ColorStyle parseStyle(const std::string& value) {
     const auto parts = split(value, ',');
     ColorStyle style;
@@ -265,6 +269,10 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
                 lower(value) == "today" ? currentLocalDate() : parseDate(value);
             else if (key == "days") newOptions.dayCount =
                 static_cast<std::size_t>(parseLong(value, key, 1, 3660));
+            else if (key == "buffer_days") newOptions.bufferDays =
+                static_cast<std::size_t>(parseLong(value, key, 1, 3660));
+            else if (key == "rebuild_threshold_days") newOptions.rebuildThresholdDays =
+                static_cast<std::size_t>(parseLong(value, key, 1, 3659));
             else if (key == "cell_width") newOptions.cellWidth =
                 static_cast<unsigned>(parseLong(value, key, 2, 20));
             else if (key == "show_grid") newOptions.showGrid = parseBool(value, key);
@@ -291,6 +299,7 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
             else if (key == "color.day_name") newColors.dayName = parseStyle(value);
             else if (key == "color.weekend") newColors.weekend = parseStyle(value);
             else if (key == "color.current_day") newColors.currentDay = parseStyle(value);
+            else if (key == "color.selected_day") newColors.selectedDay = parseStyle(value);
             else if (key == "color.time_info") newColors.timeInfo = parseStyle(value);
             else if (key == "color.grid") newColors.grid = parseStyle(value);
             else throw std::runtime_error("unknown setting '" + key + "'");
@@ -303,20 +312,37 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
     rebuildTimeline();
 }
 
+
+
 const HeaderOptions& RCalHeaderFramework::options() const noexcept { return options_; }
 const HeaderColors& RCalHeaderFramework::colors() const noexcept { return colors_; }
 const std::vector<TimelineDay>& RCalHeaderFramework::timeline() const noexcept { return timeline_; }
+const Date& RCalHeaderFramework::selectedDate() const noexcept { return selectedDate_; }
+std::size_t RCalHeaderFramework::firstVisibleDay() const noexcept { return firstVisibleDay_; }
+std::size_t RCalHeaderFramework::visibleDayCount() const noexcept { return visibleDayCount_; }
+
+
 
 void RCalHeaderFramework::setOptions(HeaderOptions options) {
     options_ = std::move(options);
     rebuildTimeline();
 }
 
-void RCalHeaderFramework::setColors(HeaderColors colors) { colors_ = std::move(colors); }
+
+
+void RCalHeaderFramework::setColors(HeaderColors colors)
+{
+    colors_ = std::move(colors);
+}
+
+
 
 void RCalHeaderFramework::rebuildTimeline() {
     validateDate(options_.startDate);
     if (options_.dayCount == 0) throw std::runtime_error("dayCount must be at least 1");
+    if (options_.bufferDays == 0) throw std::runtime_error("bufferDays must be at least 1");
+    if (options_.rebuildThresholdDays >= options_.bufferDays)
+        throw std::runtime_error("rebuildThresholdDays must be smaller than bufferDays");
     if (options_.cellWidth < 2) throw std::runtime_error("cellWidth must be at least 2");
     timeline_.clear();
     timeline_.reserve(options_.dayCount);
@@ -328,9 +354,156 @@ void RCalHeaderFramework::rebuildTimeline() {
         const unsigned weekday = isoWeekday(absolute);
         timeline_.push_back({date, ordinalDay(date), isoWeek(date, weekday), weekday});
     }
+    selectedDate_ = options_.startDate;
+    selectedDayIndex_ = 0;
+    firstVisibleDay_ = 0;
+    visibleDayCount_ = 0;
+    viewportInitialized_ = false;
 }
 
-int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
+
+
+void RCalHeaderFramework::rebuildBufferedTimeline(Date selected, std::size_t visibleDays,
+                                                  std::size_t selectedOffset) {
+    validateDate(selected);
+    selectedOffset = std::min(selectedOffset, visibleDays - 1);
+    const std::size_t buffer = options_.bufferDays;
+    const Date firstDate = addDays(selected,
+        -static_cast<long long>(buffer + selectedOffset));
+    const std::size_t count = buffer + visibleDays + buffer;
+
+    timeline_.clear();
+    timeline_.reserve(count);
+    const long long first = daysFromCivil(firstDate.year, firstDate.month, firstDate.day);
+    for (std::size_t offset = 0; offset < count; ++offset) {
+        const Date date = civilFromDays(first + static_cast<long long>(offset));
+        const unsigned weekday = isoWeekday(first + static_cast<long long>(offset));
+        timeline_.push_back({date, ordinalDay(date), isoWeek(date, weekday), weekday});
+    }
+
+    selectedDate_ = selected;
+    firstVisibleDay_ = buffer;
+    selectedDayIndex_ = buffer + selectedOffset;
+    visibleDayCount_ = visibleDays;
+    viewportInitialized_ = true;
+}
+
+
+
+void RCalHeaderFramework::ensureViewport(WINDOW* window, int left) {
+    int windowHeight = 0;
+    int windowWidth = 0;
+    getmaxyx(window, windowHeight, windowWidth);
+    (void)windowHeight;
+
+    const std::array<std::string, 6> labels{{
+        options_.yearLabel, options_.monthLabel, options_.weekLabel,
+        options_.dateLabel, options_.dayLabel, options_.timeInfoLabel
+    }};
+    std::size_t labelWidth = 1;
+    for (const auto& label : labels) labelWidth = std::max(labelWidth, label.size());
+    const int firstCell = left + static_cast<int>(labelWidth) + 1;
+    const int available = std::max(0, windowWidth - firstCell);
+    const std::size_t stride = options_.cellWidth + (options_.showGrid ? 1U : 0U);
+    const std::size_t completeCells = static_cast<std::size_t>(available) +
+        (options_.showGrid ? 1U : 0U);
+    const std::size_t visibleDays = completeCells / stride;
+    if (visibleDays == 0) {
+        visibleDayCount_ = 0;
+        return;
+    }
+
+    if (!viewportInitialized_ || visibleDays != visibleDayCount_) {
+        rebuildBufferedTimeline(selectedDate_, visibleDays, visibleDays / 2);
+    }
+}
+
+
+
+void RCalHeaderFramework::moveSelection(int days) {
+    if (days == 0) return;
+    const Date moved = addDays(selectedDate_, days);
+    validateDate(moved);
+
+    if (!viewportInitialized_ || visibleDayCount_ == 0) {
+        selectedDate_ = moved;
+        options_.startDate = moved;
+        return;
+    }
+
+    const long long candidate = static_cast<long long>(selectedDayIndex_) + days;
+    if (candidate < 0 || candidate >= static_cast<long long>(timeline_.size())) {
+        rebuildBufferedTimeline(moved, visibleDayCount_, visibleDayCount_ / 2);
+        return;
+    }
+
+    selectedDate_ = moved;
+    selectedDayIndex_ = static_cast<std::size_t>(candidate);
+    if (selectedDayIndex_ < firstVisibleDay_) {
+        firstVisibleDay_ = selectedDayIndex_;
+    } else if (selectedDayIndex_ >= firstVisibleDay_ + visibleDayCount_) {
+        firstVisibleDay_ = selectedDayIndex_ - visibleDayCount_ + 1;
+    }
+
+    const std::size_t rightEdge = firstVisibleDay_ + visibleDayCount_;
+    const bool nearLeft = firstVisibleDay_ < options_.rebuildThresholdDays;
+    const bool nearRight = timeline_.size() - std::min(rightEdge, timeline_.size()) <
+                           options_.rebuildThresholdDays;
+    if (nearLeft || nearRight) {
+        const std::size_t selectedOffset = selectedDayIndex_ - firstVisibleDay_;
+        rebuildBufferedTimeline(selectedDate_, visibleDayCount_, selectedOffset);
+    }
+}
+
+
+
+void RCalHeaderFramework::selectDate(Date date) {
+    validateDate(date);
+    selectedDate_ = date;
+    if (viewportInitialized_ && visibleDayCount_ > 0)
+        rebuildBufferedTimeline(date, visibleDayCount_, visibleDayCount_ / 2);
+    else
+        options_.startDate = date;
+}
+
+
+
+InputResult RCalHeaderFramework::handleInput(int key, WINDOW* window) {
+    if (!window) throw std::invalid_argument("input window must not be null");
+    switch (key) {
+        case 'q':
+        case 'Q':
+        case 27:
+            return InputResult::quit;
+        case KEY_LEFT:
+        case 'h':
+            moveSelection(-1);
+            return InputResult::redraw;
+        case KEY_RIGHT:
+        case 'l':
+            moveSelection(1);
+            return InputResult::redraw;
+        case KEY_PPAGE:
+            moveSelection(-static_cast<int>(std::max<std::size_t>(1, visibleDayCount_)));
+            return InputResult::redraw;
+        case KEY_NPAGE:
+            moveSelection(static_cast<int>(std::max<std::size_t>(1, visibleDayCount_)));
+            return InputResult::redraw;
+        case KEY_HOME:
+        case 't':
+            selectDate(currentLocalDate());
+            return InputResult::redraw;
+        case KEY_RESIZE:
+            viewportInitialized_ = false;
+            return InputResult::redraw;
+        default:
+            return InputResult::ignored;
+    }
+}
+
+
+
+int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
     if (!window) throw std::invalid_argument("render window must not be null");
     if (top < 0 || left < 0)
         throw std::invalid_argument("render position must not be negative");
@@ -339,6 +512,7 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
     int windowWidth = 0;
     getmaxyx(window, windowHeight, windowWidth);
     if (top >= windowHeight || left >= windowWidth) return 0;
+    ensureViewport(window, left);
 
     curs_set(0);
     if (has_colors()) { start_color(); use_default_colors(); }
@@ -388,10 +562,13 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
     std::vector<std::string> years;
     std::vector<std::string> months;
     std::vector<std::string> weeks;
-    years.reserve(timeline_.size());
-    months.reserve(timeline_.size());
-    weeks.reserve(timeline_.size());
-    for (const auto& day : timeline_) {
+    const std::size_t visibleEnd = std::min(timeline_.size(),
+                                             firstVisibleDay_ + visibleDayCount_);
+    years.reserve(visibleDayCount_);
+    months.reserve(visibleDayCount_);
+    weeks.reserve(visibleDayCount_);
+    for (std::size_t i = firstVisibleDay_; i < visibleEnd; ++i) {
+        const auto& day = timeline_[i];
         years.push_back(std::to_string(day.date.year));
         months.push_back(options_.monthNames.at(day.date.month - 1));
         weeks.push_back(std::to_string(day.isoWeek));
@@ -401,15 +578,20 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
     renderSpans(2, weeks, colors_.weekNumber);
 
     const Date today = currentLocalDate();
-    for (std::size_t i = 0; i < timeline_.size(); ++i) {
+    for (std::size_t i = firstVisibleDay_; i < visibleEnd; ++i) {
         const auto& day = timeline_[i];
-        const int x = firstCell + static_cast<int>(i * stride);
+        const std::size_t visibleIndex = i - firstVisibleDay_;
+        const int x = firstCell + static_cast<int>(visibleIndex * stride);
         if (x >= windowWidth) break;
         const bool isToday = sameDate(day.date, today);
-        const ColorStyle& dateStyle = isToday ? colors_.currentDay : colors_.date;
+        const bool isSelected = i == selectedDayIndex_;
+        const ColorStyle& dateStyle = isToday ? colors_.currentDay
+            : (isSelected ? colors_.selectedDay : colors_.date);
         const ColorStyle& dayStyle = isToday ? colors_.currentDay
-            : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName);
-        const ColorStyle& infoStyle = isToday ? colors_.currentDay : colors_.timeInfo;
+            : (isSelected ? colors_.selectedDay
+            : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName));
+        const ColorStyle& infoStyle = isToday ? colors_.currentDay
+            : (isSelected ? colors_.selectedDay : colors_.timeInfo);
         put(window, top + 3, x, centered(std::to_string(day.date.day), width), styles.attributes(dateStyle));
         put(window, top + 4, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));
         put(window, top + 5, x, centered(options_.timeInfo, width), styles.attributes(infoStyle));

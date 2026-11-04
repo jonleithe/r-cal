@@ -18,12 +18,18 @@ int main() {
     header.setOptions(options);
     assert(header.timeline()[1].date.day == 29);
     assert(header.timeline()[2].date.month == 3 && header.timeline()[2].date.day == 1);
+    header.moveSelection(2);
+    assert(header.selectedDate().month == 3 && header.selectedDate().day == 1);
+    header.moveSelection(-2);
+    assert(header.selectedDate().month == 2 && header.selectedDate().day == 28);
 
     const auto configured = rcal::RCalHeaderFramework::fromConfigFile(
         std::string(RCAL_SOURCE_DIR) + "/config/rcal.conf.example");
-    assert(configured.timeline().size() == 42);
+    assert(configured.options().bufferDays == 90);
+    assert(configured.options().rebuildThresholdDays == 30);
     assert(configured.colors().weekend.foreground == "red");
     assert(configured.colors().currentDay.foreground == "black");
     assert(configured.colors().currentDay.background == "yellow");
     assert(configured.colors().currentDay.bold);
+    assert(configured.colors().selectedDay.background == "blue");
 }

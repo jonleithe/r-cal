@@ -40,6 +40,7 @@ struct HeaderColors{
     ColorStyle dayName;
     ColorStyle weekend;
     ColorStyle currentDay{"black", "yellow", true, false, false};
+    ColorStyle selectedDay{"white", "blue", true, false, false};
     ColorStyle timeInfo;
     ColorStyle grid;
 };
@@ -49,6 +50,8 @@ struct HeaderColors{
 struct HeaderOptions{
     Date startDate;
     std::size_t dayCount = 31;
+    std::size_t bufferDays = 90;
+    std::size_t rebuildThresholdDays = 30;
     unsigned cellWidth = 4;
     bool showGrid = true;
     std::string timeInfo;
@@ -81,6 +84,14 @@ struct TimelineDay{
 
 
 
+enum class InputResult{
+    ignored,
+    redraw,
+    quit
+};
+
+
+
 class RCalHeaderFramework{
 public:
     RCalHeaderFramework();
@@ -92,19 +103,34 @@ public:
     const HeaderOptions& options() const noexcept;
     const HeaderColors& colors() const noexcept;
     const std::vector<TimelineDay>& timeline() const noexcept;
+    const Date& selectedDate() const noexcept;
+    std::size_t firstVisibleDay() const noexcept;
+    std::size_t visibleDayCount() const noexcept;
 
     void setOptions(HeaderOptions options);
     void setColors(HeaderColors colors);
     void rebuildTimeline();
+    void moveSelection(int days);
+    void selectDate(Date date);
+    InputResult handleInput(int key, WINDOW* window);
 
     // The caller must initialize curses with initscr() before rendering.
     // Returns the number of terminal rows written.
-    int render(WINDOW* window, int top = 0, int left = 0) const;
+    int render(WINDOW* window, int top = 0, int left = 0);
 
 private:
+    void ensureViewport(WINDOW* window, int left);
+    void rebuildBufferedTimeline(Date selected, std::size_t visibleDays,
+                                 std::size_t selectedOffset);
+
     HeaderOptions options_;
     HeaderColors colors_;
     std::vector<TimelineDay> timeline_;
+    Date selectedDate_;
+    std::size_t selectedDayIndex_ = 0;
+    std::size_t firstVisibleDay_ = 0;
+    std::size_t visibleDayCount_ = 0;
+    bool viewportInitialized_ = false;
 };
 
 } // namespace rcal
