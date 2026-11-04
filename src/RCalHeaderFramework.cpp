@@ -6,6 +6,7 @@
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
+#include <cwchar>
 #include <ctime>
 #include <fstream>
 #include <map>
@@ -253,13 +254,60 @@ struct StyleRegistry {
     }
 };
 
-std::string centered(std::string text, unsigned width) {
-    if (text.size() > width) text.resize(width);
-    const std::size_t left = (width - text.size()) / 2;
-    return std::string(left, ' ') + text + std::string(width - left - text.size(), ' ');
+int characterWidth(wchar_t character) {
+    const int width = ::wcwidth(character);
+    return width < 0 ? 1 : width;
 }
 
-void put(WINDOW* window, int y, int x, const std::string& text, attr_t attributes) {
+std::wstring toWide(const std::string& text) {
+    std::wstring result;
+    result.reserve(text.size());
+    std::mbstate_t state{};
+    const char* position = text.data();
+    std::size_t remaining = text.size();
+    while (remaining > 0) {
+        wchar_t character = L'\0';
+        const std::size_t length = std::mbrtowc(&character, position, remaining, &state);
+        if (length == static_cast<std::size_t>(-1) ||
+            length == static_cast<std::size_t>(-2)) {
+            throw std::runtime_error("invalid UTF-8 text in calendar configuration");
+        }
+        if (length == 0) break;
+        result.push_back(character);
+        position += length;
+        remaining -= length;
+    }
+    return result;
+}
+
+std::wstring fitToWidth(const std::wstring& text, unsigned width) {
+    std::wstring result;
+    unsigned used = 0;
+    for (wchar_t character : text) {
+        const unsigned characterColumns = static_cast<unsigned>(characterWidth(character));
+        if (used + characterColumns > width) break;
+        result.push_back(character);
+        used += characterColumns;
+    }
+    return result;
+}
+
+unsigned displayWidth(const std::wstring& text) {
+    unsigned result = 0;
+    for (wchar_t character : text)
+        result += static_cast<unsigned>(characterWidth(character));
+    return result;
+}
+
+std::wstring centered(const std::string& text, unsigned width) {
+    const std::wstring fitted = fitToWidth(toWide(text), width);
+    const unsigned textWidth = displayWidth(fitted);
+    const unsigned left = (width - textWidth) / 2;
+    return std::wstring(left, L' ') + fitted +
+           std::wstring(width - left - textWidth, L' ');
+}
+
+void put(WINDOW* window, int y, int x, const std::wstring& text, attr_t attributes) {
     int windowHeight = 0;
     int windowWidth = 0;
     getmaxyx(window, windowHeight, windowWidth);
@@ -267,15 +315,23 @@ void put(WINDOW* window, int y, int x, const std::string& text, attr_t attribute
 
     std::size_t offset = 0;
     if (x < 0) {
-        offset = std::min<std::size_t>(static_cast<std::size_t>(-x), text.size());
+        int columnsToSkip = -x;
+        while (offset < text.size() && columnsToSkip > 0) {
+            columnsToSkip -= characterWidth(text[offset]);
+            ++offset;
+        }
         x = 0;
     }
-    const int available = windowWidth - x;
-    const int length = std::min<int>(available, static_cast<int>(text.size() - offset));
-    if (length <= 0) return;
+    const unsigned available = static_cast<unsigned>(windowWidth - x);
+    const std::wstring visible = fitToWidth(text.substr(offset), available);
+    if (visible.empty()) return;
 
     wattrset(window, attributes);
-    mvwaddnstr(window, y, x, text.c_str() + offset, length);
+    mvwaddnwstr(window, y, x, visible.c_str(), static_cast<int>(visible.size()));
+}
+
+void put(WINDOW* window, int y, int x, const std::string& text, attr_t attributes) {
+    put(window, y, x, toWide(text), attributes);
 }
 
 } // namespace

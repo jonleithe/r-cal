@@ -5,11 +5,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Curses REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(NCURSESW REQUIRED IMPORTED_TARGET ncursesw)
 
 add_library(rcal_header src/RCalHeaderFramework.cpp)
-target_include_directories(rcal_header PUBLIC include PRIVATE ${CURSES_INCLUDE_DIRS})
-target_link_libraries(rcal_header PUBLIC ${CURSES_LIBRARIES})
+target_include_directories(rcal_header PUBLIC include)
+target_link_libraries(rcal_header PUBLIC PkgConfig::NCURSESW)
+target_compile_definitions(rcal_header PUBLIC _XOPEN_SOURCE_EXTENDED)
 target_compile_options(rcal_header PRIVATE -Wall -Wextra -Wpedantic)
 
 add_executable(r-cal main.cpp)

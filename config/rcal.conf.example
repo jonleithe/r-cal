@@ -8,8 +8,8 @@ time_info=
 holiday_country=NO
 
 # Localization. Lists require 12 months and 7 days (Monday first).
-month_names=Januar,February,March,April,May,June,July,August,September,October,November,December
-day_names=Mon,Tue,Wed,Thu,Fri,Sat,Sun
+month_names=Januar,Februar,Mars,April,Mai,Juni,Juli,August,September,Oktober,November,Desember
+day_names=Man,Tir,Ons,Tor,Fre,Lør,Søn
 
 label.year=Year
 label.month=Month

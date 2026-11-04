@@ -7,7 +7,8 @@ day-name, and time-information rows.
 ## Build and test
 
 Requirements: a C++17 compiler, CMake 3.16 or newer, and curses development
-headers and libraries.
+headers and libraries with wide-character support (`ncursesw` on Linux).
+The build locates `ncursesw` through `pkg-config`.
 
 ```sh
 cmake -S . -B build
@@ -58,6 +59,11 @@ Sundays remain covered by the weekend style.
 When a holiday is selected, the Info row displays its full Norwegian name, for
 example `Helligdag: Kristi himmelfartsdag`. Configure or remove the prefix with
 `label.holiday_info`.
+
+Calendar text is rendered through wide-character curses, so Nordic characters
+such as `Ø`, `Æ`, and `Å` (and their lowercase forms) are supported in labels,
+month/day names, and holiday descriptions. The application initializes the
+terminal locale before starting curses.
 
 The implemented dates follow Norway's official
 [Public Holiday Act](https://lovdata.no/dokument/NL/lov/1995-02-24-12/%C2%A72)

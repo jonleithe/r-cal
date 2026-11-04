@@ -5,6 +5,13 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Nordic terminal text support added
+
+- Switched rendering and linking to wide-character curses.
+- Text clipping and centering now use terminal column widths instead of UTF-8
+  byte counts, allowing Nordic characters without corrupting alignment.
+- Updated the example configuration with Norwegian month and day names.
+
 ### Holiday explanations added
 
 - The Info row now shows the selected holiday's full Norwegian name.

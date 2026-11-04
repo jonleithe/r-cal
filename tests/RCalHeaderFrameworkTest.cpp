@@ -52,6 +52,8 @@ int main() {
     assert(configured.colors().weekend.foreground == "red");
     assert(configured.options().holidayCountry == "NO");
     assert(configured.options().holidayInfoPrefix == "Helligdag");
+    assert(configured.options().dayNames[5] == "Lør");
+    assert(configured.options().dayNames[6] == "Søn");
     assert(configured.colors().holiday.bold);
     assert(configured.colors().currentDay.foreground == "black");
     assert(configured.colors().currentDay.background == "yellow");
