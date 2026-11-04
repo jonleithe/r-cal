@@ -13,6 +13,15 @@ int main(int argc, char** argv)
         const std::string config = argc > 1 ? argv[1] : "config/rcal.conf.example";
         auto header = rcal::RCalHeaderFramework::fromConfigFile(config);
 
+        
+        rcal::DayInfo todayInfo;
+        todayInfo.workStatus = rcal::WorkStatus::workday;
+        todayInfo.hasNote = true;
+        todayInfo.taskCount = 3;
+        todayInfo.eventCount = 1;
+
+header.setDayInfo(header.selectedDate(), todayInfo);
+
         // Initializes curses and returns the default screen window, also available as stdscr.
         initscr();
 
