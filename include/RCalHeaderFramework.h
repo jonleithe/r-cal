@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -16,6 +17,25 @@ struct Date{
     int year        = 1970;
     unsigned month  = 1;
     unsigned day    = 1;
+};
+
+
+
+enum class WorkStatus{
+    unspecified,
+    workday,
+    travelling,
+    outOfOfficeWorking,
+    compensatoryLeave
+};
+
+
+
+struct DayInfo{
+    WorkStatus workStatus = WorkStatus::unspecified;
+    bool hasNote = false;
+    unsigned taskCount = 0;
+    unsigned eventCount = 0;
 };
 
 
@@ -54,9 +74,8 @@ struct HeaderOptions{
     std::size_t dayCount = 31;
     std::size_t bufferDays = 90;
     std::size_t rebuildThresholdDays = 30;
-    unsigned cellWidth = 4;
+    unsigned cellWidth = 5;
     bool showGrid = true;
-    std::string timeInfo;
     std::string holidayCountry = "NO";
 
     std::array<std::string, 12> monthNames{{
@@ -75,6 +94,7 @@ struct HeaderOptions{
     std::string dateLabel       = "Date";
     std::string dayLabel        = "Day";
     std::string timeInfoLabel   = "Info";
+    std::string detailsLabel    = "Detail";
     std::string holidayInfoPrefix = "Helligdag";
 };
 
@@ -113,9 +133,13 @@ public:
     const std::string& selectedHolidayName() const noexcept;
     std::size_t firstVisibleDay() const noexcept;
     std::size_t visibleDayCount() const noexcept;
+    const DayInfo* dayInfo(Date date) const noexcept;
+    std::string infoIndicator(Date date) const;
 
     void setOptions(HeaderOptions options);
     void setColors(HeaderColors colors);
+    void setDayInfo(Date date, DayInfo info);
+    bool removeDayInfo(Date date);
     void rebuildTimeline();
     void moveSelection(int days);
     void selectDate(Date date);
@@ -133,6 +157,7 @@ private:
     HeaderOptions options_;
     HeaderColors colors_;
     std::vector<TimelineDay> timeline_;
+    std::map<long long, DayInfo> dayInformation_;
     Date selectedDate_;
     std::size_t selectedDayIndex_ = 0;
     std::size_t firstVisibleDay_ = 0;

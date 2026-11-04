@@ -62,6 +62,29 @@ the current-day styling returns as soon as selection moves away. Resizing the
 terminal recalculates the number of visible days and keeps the selected date
 centered.
 
+## Per-day information
+
+Each date can have a `DayInfo` record without tying that data to a buffered
+timeline index. Records survive timeline rebuilds and are added through
+`setDayInfo(Date, DayInfo)`.
+
+The five-character Info cell has fixed positions:
+
+```text
+[work status][holiday][note][task count][events]
+```
+
+- Work status: `W` workday, `T` travelling, `O` out-of-office working, or `A`
+  compensatory leave (avspasering).
+- Holiday: `H` when the calendar date is a Norwegian public holiday.
+- Note: `N` when the date has an associated note.
+- Task count: `1`–`9`, or `+` for ten or more tasks.
+- Events: `E` when one or more events exist.
+
+For example, `WHN3E` means a working public holiday with a note, three tasks,
+and at least one event. `cell_width` must be at least 5. Full selected-day text,
+currently the holiday name, is shown on the Detail row below the indicators.
+
 ## Norwegian holidays
 
 Set `holiday_country=NO` to highlight Norway's named public holidays with

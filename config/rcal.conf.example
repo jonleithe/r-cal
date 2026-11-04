@@ -2,9 +2,8 @@
 start_date=today
 buffer_days=90
 rebuild_threshold_days=30
-cell_width=4
+cell_width=5
 show_grid=true
-time_info=
 holiday_country=NO
 
 # Localization. Lists require 12 months and 7 days (Monday first).
@@ -18,6 +17,7 @@ label.day_of_year=DOY
 label.date=Date
 label.day=Day
 label.time_info=Info
+label.details=Detail
 label.holiday_info=Helligdag
 
 # Syntax: foreground,background[,bold][,underline][,reverse]

@@ -45,6 +45,24 @@ int main() {
     holidays.setOptions(holidayOptions);
     assert(holidays.timeline()[0].holidayName.empty());
 
+    rcal::DayInfo mayDayInfo;
+    mayDayInfo.workStatus = rcal::WorkStatus::workday;
+    mayDayInfo.hasNote = true;
+    mayDayInfo.taskCount = 3;
+    mayDayInfo.eventCount = 1;
+    holidays.setDayInfo({2024, 5, 1}, mayDayInfo);
+    holidayOptions.holidayCountry = "NO";
+    holidays.setOptions(holidayOptions);
+    assert(holidays.infoIndicator({2024, 5, 1}) == "WHN3E");
+    assert(holidays.dayInfo({2024, 5, 1}) != nullptr);
+    holidays.rebuildTimeline();
+    assert(holidays.infoIndicator({2024, 5, 1}) == "WHN3E");
+    mayDayInfo.taskCount = 12;
+    holidays.setDayInfo({2024, 5, 2}, mayDayInfo);
+    assert(holidays.infoIndicator({2024, 5, 2}) == "W N+E");
+    assert(holidays.removeDayInfo({2024, 5, 2}));
+    assert(holidays.dayInfo({2024, 5, 2}) == nullptr);
+
     const auto configured = rcal::RCalHeaderFramework::fromConfigFile(
         std::string(RCAL_SOURCE_DIR) + "/config/rcal.conf.example");
     assert(configured.options().bufferDays == 90);
@@ -53,6 +71,8 @@ int main() {
     assert(configured.options().holidayCountry == "NO");
     assert(configured.options().holidayInfoPrefix == "Helligdag");
     assert(configured.options().dayOfYearLabel == "DOY");
+    assert(configured.options().detailsLabel == "Detail");
+    assert(configured.options().cellWidth == 5);
     assert(configured.colors().dayOfYear.foreground == "cyan");
     assert(configured.options().dayNames[5] == "Lør");
     assert(configured.options().dayNames[6] == "Søn");

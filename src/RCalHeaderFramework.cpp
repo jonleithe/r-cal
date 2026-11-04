@@ -375,10 +375,8 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
             else if (key == "rebuild_threshold_days") newOptions.rebuildThresholdDays =
                 static_cast<std::size_t>(parseLong(value, key, 1, 3659));
             else if (key == "cell_width") newOptions.cellWidth =
-                static_cast<unsigned>(parseLong(value, key, 2, 20));
+                static_cast<unsigned>(parseLong(value, key, 5, 20));
             else if (key == "show_grid") newOptions.showGrid = parseBool(value, key);
-            else if (key == "time_info") newOptions.timeInfo = value;
-
             else if (key == "holiday_country"){
                 const std::string country = lower(value);
                 if (country == "no") newOptions.holidayCountry = "NO";
@@ -403,6 +401,7 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
             else if (key == "label.date") newOptions.dateLabel = value;
             else if (key == "label.day") newOptions.dayLabel = value;
             else if (key == "label.time_info") newOptions.timeInfoLabel = value;
+            else if (key == "label.details") newOptions.detailsLabel = value;
             else if (key == "label.holiday_info") newOptions.holidayInfoPrefix = value;
             else if (key == "color.label") newColors.label = parseStyle(value);
             else if (key == "color.year") newColors.year = parseStyle(value);
@@ -444,6 +443,37 @@ std::size_t RCalHeaderFramework::visibleDayCount() const noexcept { return visib
 
 
 
+const DayInfo* RCalHeaderFramework::dayInfo(Date date) const noexcept {
+    const auto found = dayInformation_.find(daysFromCivil(date.year, date.month, date.day));
+    return found == dayInformation_.end() ? nullptr : &found->second;
+}
+
+
+
+std::string RCalHeaderFramework::infoIndicator(Date date) const {
+    validateDate(date);
+    std::string result(5, ' ');
+    const DayInfo* info = dayInfo(date);
+    if (info) {
+        switch (info->workStatus) {
+            case WorkStatus::workday: result[0] = 'W'; break;
+            case WorkStatus::travelling: result[0] = 'T'; break;
+            case WorkStatus::outOfOfficeWorking: result[0] = 'O'; break;
+            case WorkStatus::compensatoryLeave: result[0] = 'A'; break;
+            case WorkStatus::unspecified: break;
+        }
+        if (info->hasNote) result[2] = 'N';
+        if (info->taskCount > 0)
+            result[3] = info->taskCount < 10
+                ? static_cast<char>('0' + info->taskCount) : '+';
+        if (info->eventCount > 0) result[4] = 'E';
+    }
+    if (!holidayName(date, options_.holidayCountry).empty()) result[1] = 'H';
+    return result;
+}
+
+
+
 void RCalHeaderFramework::setOptions(HeaderOptions options) {
     options_ = std::move(options);
     rebuildTimeline();
@@ -458,13 +488,27 @@ void RCalHeaderFramework::setColors(HeaderColors colors)
 
 
 
+void RCalHeaderFramework::setDayInfo(Date date, DayInfo info) {
+    validateDate(date);
+    dayInformation_[daysFromCivil(date.year, date.month, date.day)] = info;
+}
+
+
+
+bool RCalHeaderFramework::removeDayInfo(Date date) {
+    validateDate(date);
+    return dayInformation_.erase(daysFromCivil(date.year, date.month, date.day)) > 0;
+}
+
+
+
 void RCalHeaderFramework::rebuildTimeline() {
     validateDate(options_.startDate);
     if (options_.dayCount == 0) throw std::runtime_error("dayCount must be at least 1");
     if (options_.bufferDays == 0) throw std::runtime_error("bufferDays must be at least 1");
     if (options_.rebuildThresholdDays >= options_.bufferDays)
         throw std::runtime_error("rebuildThresholdDays must be smaller than bufferDays");
-    if (options_.cellWidth < 2) throw std::runtime_error("cellWidth must be at least 2");
+    if (options_.cellWidth < 5) throw std::runtime_error("cellWidth must be at least 5");
     timeline_.clear();
     timeline_.reserve(options_.dayCount);
     const long long first = daysFromCivil(options_.startDate.year, options_.startDate.month,
@@ -519,10 +563,10 @@ void RCalHeaderFramework::ensureViewport(WINDOW* window, int left) {
     getmaxyx(window, windowHeight, windowWidth);
     (void)windowHeight;
 
-    const std::array<std::string, 7> labels{{
+    const std::array<std::string, 8> labels{{
         options_.yearLabel, options_.monthLabel, options_.weekLabel,
         options_.dayOfYearLabel, options_.dateLabel, options_.dayLabel,
-        options_.timeInfoLabel
+        options_.timeInfoLabel, options_.detailsLabel
     }};
     std::size_t labelWidth = 1;
     for (const auto& label : labels) labelWidth = std::max(labelWidth, label.size());
@@ -648,16 +692,16 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
     if (has_colors()) { start_color(); use_default_colors(); }
     StyleRegistry styles;
     const unsigned width = options_.cellWidth;
-    const std::array<std::string, 7> labels{{
+    const std::array<std::string, 8> labels{{
         options_.yearLabel, options_.monthLabel, options_.weekLabel,
         options_.dayOfYearLabel, options_.dateLabel, options_.dayLabel,
-        options_.timeInfoLabel
+        options_.timeInfoLabel, options_.detailsLabel
     }};
     std::size_t labelWidth = 1;
     for (const auto& label : labels) labelWidth = std::max(labelWidth, label.size());
     const int firstCell = left + static_cast<int>(labelWidth) + 1;
 
-    for (int row = 0; row < 7; ++row) {
+    for (int row = 0; row < 8; ++row) {
         put(window, top + row, left, labels[static_cast<std::size_t>(row)],
             styles.attributes(colors_.label));
         if (options_.showGrid)
@@ -733,7 +777,7 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
         put(window, top + 3, x, centered(std::to_string(day.dayOfYear), width), styles.attributes(dayOfYearStyle));
         put(window, top + 4, x, centered(std::to_string(day.date.day), width), styles.attributes(dateStyle));
         put(window, top + 5, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));
-        put(window, top + 6, x, centered(options_.timeInfo, width), styles.attributes(infoStyle));
+        put(window, top + 6, x, centered(infoIndicator(day.date), width), styles.attributes(infoStyle));
         if (options_.showGrid) {
             const int separator = x + static_cast<int>(width);
             for (int row = 3; row < 7; ++row)
@@ -743,15 +787,12 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
 
     const std::string& selectedHoliday = selectedHolidayName();
     if (!selectedHoliday.empty()) {
-        const int available = std::max(0, windowWidth - firstCell);
-        put(window, top + 6, firstCell, std::string(static_cast<std::size_t>(available), ' '),
-            styles.attributes(colors_.timeInfo));
         const std::string explanation = options_.holidayInfoPrefix.empty()
             ? selectedHoliday : options_.holidayInfoPrefix + ": " + selectedHoliday;
-        put(window, top + 6, firstCell, explanation, styles.attributes(colors_.holiday));
+        put(window, top + 7, firstCell, explanation, styles.attributes(colors_.holiday));
     }
     wattrset(window, A_NORMAL);
-    return std::min(7, windowHeight - top);
+    return std::min(8, windowHeight - top);
 }
 
 } // namespace rcal

@@ -10,6 +10,10 @@ computer.
 implemented in C++17, built with CMake, rendered with curses, and tested through
 CTest. C remains an enabled project language for future components.
 
+Calendar facts belong in `TimelineDay`; user-entered work, note, task, and event
+metadata belongs in date-keyed `DayInfo` records so viewport rebuilds cannot
+invalidate or discard it.
+
 ## Source of truth
 
 - `README.md` describes the project and how to use it.

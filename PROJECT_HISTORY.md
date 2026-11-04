@@ -5,6 +5,15 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Per-date information model added
+
+- Added date-keyed `DayInfo` records for work status, notes, tasks, and events;
+  these remain stable when the buffered timeline is rebuilt.
+- The five-character Info cell now renders fixed status, holiday, note, task,
+  and event positions.
+- Moved full selected-holiday text to a separate Detail row so daily indicators
+  remain visible.
+
 ### Selection highlight precedence corrected
 
 - Selected-day styling now takes precedence over current-day styling, keeping
