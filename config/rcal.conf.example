@@ -5,6 +5,7 @@ rebuild_threshold_days=30
 cell_width=4
 show_grid=true
 time_info=
+holiday_country=NO
 
 # Localization. Lists require 12 months and 7 days (Monday first).
 month_names=Januar,February,Mars,April,May,June,July,August,September,October,November,December
@@ -26,6 +27,7 @@ color.week_number=green,default
 color.date=white,default
 color.day_name=white,default
 color.weekend=red,default
+color.holiday=red,default,bold
 color.current_day=black,yellow,bold
 color.selected_day=white,blue,bold
 color.time_info=magenta,default

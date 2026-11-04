@@ -23,11 +23,30 @@ int main() {
     header.moveSelection(-2);
     assert(header.selectedDate().month == 2 && header.selectedDate().day == 28);
 
+    rcal::HeaderOptions holidayOptions;
+    holidayOptions.startDate = {2024, 3, 28};
+    holidayOptions.dayCount = 55;
+    rcal::RCalHeaderFramework holidays(holidayOptions);
+    assert(holidays.timeline()[0].holidayName == "Skjærtorsdag");
+    assert(holidays.timeline()[1].holidayName == "Langfredag");
+    assert(holidays.timeline()[3].holidayName == "Første påskedag");
+    assert(holidays.timeline()[4].holidayName == "Andre påskedag");
+    assert(holidays.timeline()[34].holidayName == "Arbeidernes dag");
+    assert(holidays.timeline()[42].holidayName == "Kristi himmelfartsdag");
+    assert(holidays.timeline()[50].holidayName == "Grunnlovsdagen");
+    assert(holidays.timeline()[52].holidayName == "Første pinsedag");
+    assert(holidays.timeline()[53].holidayName == "Andre pinsedag");
+    holidayOptions.holidayCountry = "none";
+    holidays.setOptions(holidayOptions);
+    assert(holidays.timeline()[0].holidayName.empty());
+
     const auto configured = rcal::RCalHeaderFramework::fromConfigFile(
         std::string(RCAL_SOURCE_DIR) + "/config/rcal.conf.example");
     assert(configured.options().bufferDays == 90);
     assert(configured.options().rebuildThresholdDays == 30);
     assert(configured.colors().weekend.foreground == "red");
+    assert(configured.options().holidayCountry == "NO");
+    assert(configured.colors().holiday.bold);
     assert(configured.colors().currentDay.foreground == "black");
     assert(configured.colors().currentDay.background == "yellow");
     assert(configured.colors().currentDay.bold);

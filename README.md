@@ -47,6 +47,18 @@ Today remains highlighted with `color.current_day`; a different selected date
 uses `color.selected_day`. Resizing the terminal recalculates the number of
 visible days and keeps the selected date centered.
 
+## Norwegian holidays
+
+Set `holiday_country=NO` to highlight Norway's named public holidays with
+`color.holiday`. The calendar calculates Easter-relative holidays for every
+year, along with New Year's Day, 1 May, 17 May, and the two Christmas days.
+Set `holiday_country=none` to disable national-holiday highlighting. Ordinary
+Sundays remain covered by the weekend style.
+
+The implemented dates follow Norway's official
+[Public Holiday Act](https://lovdata.no/dokument/NL/lov/1995-02-24-12/%C2%A72)
+and the [Act relating to 1 and 17 May](https://lovdata.no/dokument/NL/lov/1947-04-26-1).
+
 ## Debugging in VS Code
 
 Install Microsoft's C/C++ extension, open the repository folder, set a

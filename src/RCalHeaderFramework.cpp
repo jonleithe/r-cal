@@ -159,6 +159,51 @@ Date addDays(const Date& date, long long days) {
     return civilFromDays(daysFromCivil(date.year, date.month, date.day) + days);
 }
 
+Date gregorianEasterSunday(int year) {
+    const int a = year % 19;
+    const int b = year / 100;
+    const int c = year % 100;
+    const int d = b / 4;
+    const int e = b % 4;
+    const int f = (b + 8) / 25;
+    const int g = (b - f + 1) / 3;
+    const int h = (19 * a + b - d - g + 15) % 30;
+    const int i = c / 4;
+    const int k = c % 4;
+    const int l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const int m = (a + 11 * h + 22 * l) / 451;
+    const unsigned month = static_cast<unsigned>((h + l - 7 * m + 114) / 31);
+    const unsigned day = static_cast<unsigned>((h + l - 7 * m + 114) % 31 + 1);
+    return {year, month, day};
+}
+
+std::string norwegianHolidayName(const Date& date) {
+    if (date.month == 1 && date.day == 1) return "Nyttårsdag";
+    if (date.month == 5 && date.day == 1) return "Arbeidernes dag";
+    if (date.month == 5 && date.day == 17) return "Grunnlovsdagen";
+    if (date.month == 12 && date.day == 25) return "Første juledag";
+    if (date.month == 12 && date.day == 26) return "Andre juledag";
+
+    const Date easterSunday = gregorianEasterSunday(date.year);
+    const long long easter = daysFromCivil(date.year, easterSunday.month, easterSunday.day);
+    const long long offset = daysFromCivil(date.year, date.month, date.day) - easter;
+    switch (offset) {
+        case -3: return "Skjærtorsdag";
+        case -2: return "Langfredag";
+        case 0: return "Første påskedag";
+        case 1: return "Andre påskedag";
+        case 39: return "Kristi himmelfartsdag";
+        case 49: return "Første pinsedag";
+        case 50: return "Andre pinsedag";
+        default: return {};
+    }
+}
+
+std::string holidayName(const Date& date, const std::string& country) {
+    if (lower(country) == "no") return norwegianHolidayName(date);
+    return {};
+}
+
 ColorStyle parseStyle(const std::string& value) {
     const auto parts = split(value, ',');
     ColorStyle style;
@@ -277,6 +322,12 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
                 static_cast<unsigned>(parseLong(value, key, 2, 20));
             else if (key == "show_grid") newOptions.showGrid = parseBool(value, key);
             else if (key == "time_info") newOptions.timeInfo = value;
+            else if (key == "holiday_country") {
+                const std::string country = lower(value);
+                if (country == "no") newOptions.holidayCountry = "NO";
+                else if (country == "none") newOptions.holidayCountry = "none";
+                else throw std::runtime_error("unsupported holiday country '" + value + "'");
+            }
             else if (key == "month_names") {
                 const auto names = split(value, ',');
                 if (names.size() != 12) throw std::runtime_error("month_names needs 12 values");
@@ -298,6 +349,7 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
             else if (key == "color.date") newColors.date = parseStyle(value);
             else if (key == "color.day_name") newColors.dayName = parseStyle(value);
             else if (key == "color.weekend") newColors.weekend = parseStyle(value);
+            else if (key == "color.holiday") newColors.holiday = parseStyle(value);
             else if (key == "color.current_day") newColors.currentDay = parseStyle(value);
             else if (key == "color.selected_day") newColors.selectedDay = parseStyle(value);
             else if (key == "color.time_info") newColors.timeInfo = parseStyle(value);
@@ -352,7 +404,8 @@ void RCalHeaderFramework::rebuildTimeline() {
         const long long absolute = first + static_cast<long long>(offset);
         const Date date = civilFromDays(absolute);
         const unsigned weekday = isoWeekday(absolute);
-        timeline_.push_back({date, ordinalDay(date), isoWeek(date, weekday), weekday});
+        timeline_.push_back({date, ordinalDay(date), isoWeek(date, weekday), weekday,
+                             holidayName(date, options_.holidayCountry)});
     }
     selectedDate_ = options_.startDate;
     selectedDayIndex_ = 0;
@@ -378,7 +431,8 @@ void RCalHeaderFramework::rebuildBufferedTimeline(Date selected, std::size_t vis
     for (std::size_t offset = 0; offset < count; ++offset) {
         const Date date = civilFromDays(first + static_cast<long long>(offset));
         const unsigned weekday = isoWeekday(first + static_cast<long long>(offset));
-        timeline_.push_back({date, ordinalDay(date), isoWeek(date, weekday), weekday});
+        timeline_.push_back({date, ordinalDay(date), isoWeek(date, weekday), weekday,
+                             holidayName(date, options_.holidayCountry)});
     }
 
     selectedDate_ = selected;
@@ -585,13 +639,17 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
         if (x >= windowWidth) break;
         const bool isToday = sameDate(day.date, today);
         const bool isSelected = i == selectedDayIndex_;
+        const bool isHoliday = !day.holidayName.empty();
         const ColorStyle& dateStyle = isToday ? colors_.currentDay
-            : (isSelected ? colors_.selectedDay : colors_.date);
+            : (isSelected ? colors_.selectedDay
+            : (isHoliday ? colors_.holiday : colors_.date));
         const ColorStyle& dayStyle = isToday ? colors_.currentDay
             : (isSelected ? colors_.selectedDay
-            : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName));
+            : (isHoliday ? colors_.holiday
+            : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName)));
         const ColorStyle& infoStyle = isToday ? colors_.currentDay
-            : (isSelected ? colors_.selectedDay : colors_.timeInfo);
+            : (isSelected ? colors_.selectedDay
+            : (isHoliday ? colors_.holiday : colors_.timeInfo));
         put(window, top + 3, x, centered(std::to_string(day.date.day), width), styles.attributes(dateStyle));
         put(window, top + 4, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));
         put(window, top + 5, x, centered(options_.timeInfo, width), styles.attributes(infoStyle));

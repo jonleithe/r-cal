@@ -5,6 +5,13 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Norwegian public holidays added
+
+- Added automatic calculation and highlighting of Norway's fixed and
+  Easter-relative public holidays for every year in the timeline.
+- Added `holiday_country` and `color.holiday` configuration settings, with
+  `none` available to disable the holiday calendar.
+
 ### Buffered timeline navigation added
 
 - Added keyboard navigation by day and by visible page, with shortcuts to

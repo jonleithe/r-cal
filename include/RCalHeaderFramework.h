@@ -39,6 +39,7 @@ struct HeaderColors{
     ColorStyle date;
     ColorStyle dayName;
     ColorStyle weekend;
+    ColorStyle holiday{"red", "default", true, false, false};
     ColorStyle currentDay{"black", "yellow", true, false, false};
     ColorStyle selectedDay{"white", "blue", true, false, false};
     ColorStyle timeInfo;
@@ -55,6 +56,7 @@ struct HeaderOptions{
     unsigned cellWidth = 4;
     bool showGrid = true;
     std::string timeInfo;
+    std::string holidayCountry = "NO";
 
     std::array<std::string, 12> monthNames{{
         "January", "February", "March", "April", "May", "June",
@@ -80,6 +82,7 @@ struct TimelineDay{
     unsigned dayOfYear  = 1;
     unsigned isoWeek    = 1;
     unsigned isoWeekday = 1;
+    std::string holidayName;
 };
 
 
