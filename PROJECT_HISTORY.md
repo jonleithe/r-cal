@@ -5,6 +5,13 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Step-by-step debugging configured
+
+- Added VS Code tasks for Debug configuration, building, and tests.
+- Added a GDB launch profile that runs the curses application in the integrated
+  terminal with the example configuration.
+- Enabled `compile_commands.json` generation for accurate C++ IntelliSense.
+
 ### Current day highlighting added
 
 - The curses renderer hides the terminal cursor and highlights the current
