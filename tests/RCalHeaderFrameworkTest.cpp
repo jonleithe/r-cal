@@ -3,6 +3,15 @@
 #include <cassert>
 
 int main() {
+    const rcal::ColorStyle weekend{"red", "default", false, true, false};
+    const rcal::ColorStyle selection{"white", "blue", true, false, false};
+    const auto selectedWeekend = rcal::highlightedStyle(weekend, selection);
+    assert(selectedWeekend.foreground == "red");
+    assert(selectedWeekend.background == "blue");
+    assert(!selectedWeekend.bold);
+    assert(selectedWeekend.underline);
+    assert(!selectedWeekend.reverse);
+
     rcal::HeaderOptions options;
     options.startDate = {2024, 12, 30};
     options.dayCount = 4;

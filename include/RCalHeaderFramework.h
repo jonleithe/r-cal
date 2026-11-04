@@ -49,6 +49,9 @@ struct ColorStyle{
     bool reverse    = false;
 };
 
+// Applies a highlight background while retaining the content's foreground and attributes.
+ColorStyle highlightedStyle(const ColorStyle& base, const ColorStyle& highlight);
+
 
 
 struct HeaderColors{
@@ -62,7 +65,7 @@ struct HeaderColors{
     ColorStyle weekend;
     ColorStyle holiday{"red", "default", true, false, false};
     ColorStyle currentDay{"black", "yellow", true, false, false};
-    ColorStyle selectedDay{"white", "blue", true, false, false};
+    ColorStyle selectedDay{"default", "blue", false, false, false};
     ColorStyle timeInfo;
     ColorStyle grid;
 };

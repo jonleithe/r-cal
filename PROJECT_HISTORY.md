@@ -5,6 +5,11 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Selection preserves day colors
+
+- Selected dates retain their current-day, holiday, weekend, or row foreground
+  color and attributes while using the configured selection background.
+
 ### Per-date information model added
 
 - Added date-keyed `DayInfo` records for work status, notes, tasks, and events;

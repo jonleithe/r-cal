@@ -220,6 +220,12 @@ ColorStyle parseStyle(const std::string& value) {
     return style;
 }
 
+ColorStyle selectedStyle(const ColorStyle& base, const ColorStyle& highlight) {
+    ColorStyle result = base;
+    result.background = highlight.background;
+    return result;
+}
+
 short cursesColor(const std::string& name) {
     static const std::map<std::string, short> names{{
         {"default", -1}, {"black", COLOR_BLACK}, {"red", COLOR_RED},
@@ -335,6 +341,10 @@ void put(WINDOW* window, int y, int x, const std::string& text, attr_t attribute
 }
 
 } // namespace
+
+ColorStyle highlightedStyle(const ColorStyle& base, const ColorStyle& highlight) {
+    return selectedStyle(base, highlight);
+}
 
 RCalHeaderFramework::RCalHeaderFramework() { rebuildTimeline(); }
 
@@ -761,19 +771,24 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
         const bool isToday = sameDate(day.date, today);
         const bool isSelected = i == selectedDayIndex_;
         const bool isHoliday = !day.holidayName.empty();
-        const ColorStyle& dayOfYearStyle = isSelected ? colors_.selectedDay
-            : (isToday ? colors_.currentDay
-            : (isHoliday ? colors_.holiday : colors_.dayOfYear));
-        const ColorStyle& dateStyle = isSelected ? colors_.selectedDay
-            : (isToday ? colors_.currentDay
-            : (isHoliday ? colors_.holiday : colors_.date));
-        const ColorStyle& dayStyle = isSelected ? colors_.selectedDay
-            : (isToday ? colors_.currentDay
+        const ColorStyle& baseDayOfYearStyle = isToday ? colors_.currentDay
+            : (isHoliday ? colors_.holiday : colors_.dayOfYear);
+        const ColorStyle& baseDateStyle = isToday ? colors_.currentDay
+            : (isHoliday ? colors_.holiday : colors_.date);
+        const ColorStyle& baseDayStyle = isToday ? colors_.currentDay
             : (isHoliday ? colors_.holiday
-            : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName)));
-        const ColorStyle& infoStyle = isSelected ? colors_.selectedDay
-            : (isToday ? colors_.currentDay
-            : (isHoliday ? colors_.holiday : colors_.timeInfo));
+            : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName));
+        const ColorStyle& baseInfoStyle = isToday ? colors_.currentDay
+            : (isHoliday ? colors_.holiday : colors_.timeInfo);
+        const ColorStyle dayOfYearStyle = isSelected
+            ? highlightedStyle(baseDayOfYearStyle, colors_.selectedDay)
+            : baseDayOfYearStyle;
+        const ColorStyle dateStyle = isSelected
+            ? highlightedStyle(baseDateStyle, colors_.selectedDay) : baseDateStyle;
+        const ColorStyle dayStyle = isSelected
+            ? highlightedStyle(baseDayStyle, colors_.selectedDay) : baseDayStyle;
+        const ColorStyle infoStyle = isSelected
+            ? highlightedStyle(baseInfoStyle, colors_.selectedDay) : baseInfoStyle;
         put(window, top + 3, x, centered(std::to_string(day.dayOfYear), width), styles.attributes(dayOfYearStyle));
         put(window, top + 4, x, centered(std::to_string(day.date.day), width), styles.attributes(dateStyle));
         put(window, top + 5, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));
