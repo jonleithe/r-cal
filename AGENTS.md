@@ -6,8 +6,10 @@ computer.
 
 ## Project status
 
-`r-cal` is at the repository-bootstrap stage. The implementation language,
-runtime, build process, and test tooling have not been chosen yet. Do not infer them from the generic C/C++ entries currently present in `.gitignore`.
+`r-cal` is a C and C++ project at the repository-bootstrap stage. The compiler,
+C and C++ language standards, build process, and test tooling have not been
+chosen yet. Do not assume specific tools or standards until they are documented
+here.
 
 ## Source of truth
 
@@ -49,7 +51,8 @@ out of commits, or place them on a clearly named work-in-progress branch.
 
 ## Commands
 
-No setup, build, test, lint, or run commands are defined yet. Replace this
+No setup, build, test, lint, or run commands are defined yet. The compiler,
+language standards, and build system are also still undecided. Replace this
 section with verified commands as soon as the implementation is introduced.
 
 ## Keeping this file useful

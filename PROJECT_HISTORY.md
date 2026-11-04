@@ -5,6 +5,12 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### C and C++ selected
+
+- The project will be implemented in C and C++.
+- The compiler, C and C++ language standards, build system, and test tooling
+  remain to be selected.
+
 ### Repository initialized
 
 - Created the repository with an MIT license, a starter `.gitignore`, and a
@@ -17,8 +23,8 @@ This is a concise, chronological record of major milestones and decisions for
   contributors.
 - Added this history file so important decisions and milestones remain easy to
   find without reconstructing them from individual commits.
-- The project is still in its bootstrap phase; its scope, architecture, tech
-  stack, and development commands have not yet been documented.
+- The project is still in its bootstrap phase; its scope, architecture, and
+  development commands have not yet been documented.
 
 ## Entry format
 
