@@ -194,8 +194,22 @@ std::string centered(std::string text, unsigned width) {
 }
 
 void put(WINDOW* window, int y, int x, const std::string& text, attr_t attributes) {
+    int windowHeight = 0;
+    int windowWidth = 0;
+    getmaxyx(window, windowHeight, windowWidth);
+    if (y < 0 || y >= windowHeight || x >= windowWidth || text.empty()) return;
+
+    std::size_t offset = 0;
+    if (x < 0) {
+        offset = std::min<std::size_t>(static_cast<std::size_t>(-x), text.size());
+        x = 0;
+    }
+    const int available = windowWidth - x;
+    const int length = std::min<int>(available, static_cast<int>(text.size() - offset));
+    if (length <= 0) return;
+
     wattrset(window, attributes);
-    mvwaddnstr(window, y, x, text.c_str(), static_cast<int>(text.size()));
+    mvwaddnstr(window, y, x, text.c_str() + offset, length);
 }
 
 } // namespace
@@ -299,6 +313,14 @@ void RCalHeaderFramework::rebuildTimeline() {
 
 int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
     if (!window) throw std::invalid_argument("render window must not be null");
+    if (top < 0 || left < 0)
+        throw std::invalid_argument("render position must not be negative");
+
+    int windowHeight = 0;
+    int windowWidth = 0;
+    getmaxyx(window, windowHeight, windowWidth);
+    if (top >= windowHeight || left >= windowWidth) return 0;
+
     if (has_colors()) { start_color(); use_default_colors(); }
     StyleRegistry styles;
     const unsigned width = options_.cellWidth;
@@ -327,9 +349,16 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
             const unsigned spanWidth = static_cast<unsigned>((end - begin) * stride -
                                        (options_.showGrid ? 1U : 0U));
             const int x = firstCell + static_cast<int>(begin * stride);
-            put(window, top + row, x, centered(values[begin], spanWidth),
+            if (x >= windowWidth) break;
+
+            // Center a group title in the visible part of the span. This keeps
+            // long groups, such as a whole month, labelled even when their
+            // natural centre is outside the terminal viewport.
+            const int visibleEnd = std::min(windowWidth, x + static_cast<int>(spanWidth));
+            const unsigned visibleWidth = static_cast<unsigned>(std::max(0, visibleEnd - x));
+            put(window, top + row, x, centered(values[begin], visibleWidth),
                 styles.attributes(style));
-            if (options_.showGrid)
+            if (options_.showGrid && x + static_cast<int>(spanWidth) < windowWidth)
                 put(window, top + row, x + static_cast<int>(spanWidth), "|",
                     styles.attributes(colors_.grid));
             begin = end;
@@ -354,6 +383,7 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
     for (std::size_t i = 0; i < timeline_.size(); ++i) {
         const auto& day = timeline_[i];
         const int x = firstCell + static_cast<int>(i * stride);
+        if (x >= windowWidth) break;
         const ColorStyle& dayStyle = day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName;
         put(window, top + 3, x, centered(std::to_string(day.date.day), width), styles.attributes(colors_.date));
         put(window, top + 4, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));
@@ -365,7 +395,7 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
         }
     }
     wattrset(window, A_NORMAL);
-    return 6;
+    return std::min(6, windowHeight - top);
 }
 
 } // namespace rcal

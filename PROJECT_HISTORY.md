@@ -5,6 +5,13 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Timeline rendering constrained to terminal width
+
+- Curses output is clipped at the active window's horizontal boundary instead
+  of wrapping into adjacent rows.
+- Off-screen timeline cells are skipped, while partially visible year, month,
+  and week headings are centered within the visible viewport.
+
 ### Header convention selected
 
 - C and C++ headers use `#pragma once` instead of macro include guards.
