@@ -18,7 +18,7 @@ ctest --test-dir build --output-on-failure
 Run the interactive example from the repository root:
 
 ```sh
-./build/rcal_header_demo config/rcal.conf.example
+./build/r-cal config/rcal.conf.example
 ```
 
 Press any key to exit. Copy `config/rcal.conf.example` and edit its labels,

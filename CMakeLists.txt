@@ -12,8 +12,8 @@ target_include_directories(rcal_header PUBLIC include PRIVATE ${CURSES_INCLUDE_D
 target_link_libraries(rcal_header PUBLIC ${CURSES_LIBRARIES})
 target_compile_options(rcal_header PRIVATE -Wall -Wextra -Wpedantic)
 
-add_executable(rcal_header_demo examples/rcal_header_demo.cpp)
-target_link_libraries(rcal_header_demo PRIVATE rcal_header)
+add_executable(r-cal main.cpp)
+target_link_libraries(r-cal PRIVATE rcal_header)
 
 include(CTest)
 if(BUILD_TESTING)

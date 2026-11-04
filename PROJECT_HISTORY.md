@@ -5,6 +5,11 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Application entry point promoted
+
+- Moved the executable entry point from the examples directory to the project
+  root as `main.cpp` and renamed the built executable to `r-cal`.
+
 ### Timeline rendering constrained to terminal width
 
 - Curses output is clipped at the active window's horizontal boundary instead

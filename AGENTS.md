@@ -63,7 +63,7 @@ ctest --test-dir build --output-on-failure
 Run the curses demo from the repository root with:
 
 ```sh
-./build/rcal_header_demo config/rcal.conf.example
+./build/r-cal config/rcal.conf.example
 ```
 
 The current code requires CMake 3.16 or newer, a C++17 compiler, and curses
