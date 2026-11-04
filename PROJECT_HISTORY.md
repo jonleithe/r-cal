@@ -5,6 +5,10 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Header convention selected
+
+- C and C++ headers use `#pragma once` instead of macro include guards.
+
 ### Configurable curses timeline header introduced
 
 - Reworked the initial header stub into a C++17 timeline model and curses

@@ -1,6 +1,4 @@
-
-#ifndef RCAL_HEADER_FRAMEWORK_H
-#define RCAL_HEADER_FRAMEWORK_H
+#pragma once
 
 #include <array>
 #include <cstddef>
@@ -93,5 +91,3 @@ private:
 };
 
 } // namespace rcal
-
-#endif

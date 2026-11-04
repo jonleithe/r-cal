@@ -34,6 +34,8 @@ in the same commit as the change.
    workflow changes, releases, and other milestones. Routine fixes do not need
    an entry unless they affect future work.
 7. Write commit messages in the imperative mood and keep each commit coherent.
+8. Use `#pragma once` for C and C++ header files instead of macro include
+   guards.
 
 ## Cross-computer workflow
 
