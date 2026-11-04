@@ -5,6 +5,11 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Build wrapper added
+
+- Added `build.sh` modes for Debug, Release, or both configurations.
+- Debug and Release artifacts use separate build directories.
+
 ### Nordic terminal text support added
 
 - Switched rendering and linking to wide-character curses.

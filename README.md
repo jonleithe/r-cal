@@ -16,6 +16,17 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+Alternatively, use the project build wrapper:
+
+```sh
+./build.sh debug
+./build.sh release
+./build.sh all
+```
+
+Debug and Release outputs are kept separately in `build/debug` and
+`build/release`.
+
 Run the interactive example from the repository root:
 
 ```sh

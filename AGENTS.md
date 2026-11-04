@@ -60,6 +60,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+The checked-in build wrapper supports separate configurations:
+
+```sh
+./build.sh debug
+./build.sh release
+./build.sh all
+```
+
 Run the curses demo from the repository root with:
 
 ```sh
