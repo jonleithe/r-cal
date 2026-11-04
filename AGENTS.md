@@ -68,6 +68,9 @@ The checked-in build wrapper supports separate configurations:
 ./build.sh all
 ```
 
+The wrapper updates `build/r-cal` to point at the selected configuration. The
+`all` mode selects Release after building both configurations.
+
 Run the curses demo from the repository root with:
 
 ```sh

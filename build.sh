@@ -20,6 +20,15 @@ build_configuration() {
     cmake --build "${build_dir}" --parallel
 }
 
+activate_configuration() {
+    local name="$1"
+    local active_binary="${project_dir}/build/r-cal"
+
+    cmake -E rm -f "${active_binary}"
+    cmake -E create_symlink "${name}/r-cal" "${active_binary}"
+    echo "Active executable: ${active_binary} -> ${name}/r-cal"
+}
+
 usage() {
     echo "Usage: $0 {debug|release|all}" >&2
 }
@@ -27,13 +36,16 @@ usage() {
 case "${1:-}" in
     debug)
         build_configuration debug Debug
+        activate_configuration debug
         ;;
     release)
         build_configuration release Release
+        activate_configuration release
         ;;
     all)
         build_configuration debug Debug
         build_configuration release Release
+        activate_configuration release
         ;;
     *)
         usage

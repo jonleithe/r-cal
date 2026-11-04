@@ -5,10 +5,18 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Day-of-year row added
+
+- Added a DOY row between Week and Date using the timeline's existing ordinal
+  day values.
+- Added configurable `label.day_of_year` and `color.day_of_year` settings.
+
 ### Build wrapper added
 
 - Added `build.sh` modes for Debug, Release, or both configurations.
 - Debug and Release artifacts use separate build directories.
+- The wrapper maintains `build/r-cal` as a link to the selected configuration,
+  preventing stale binaries from an older build layout from being launched.
 
 ### Nordic terminal text support added
 

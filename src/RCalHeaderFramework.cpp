@@ -399,6 +399,7 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
             else if (key == "label.year") newOptions.yearLabel = value;
             else if (key == "label.month") newOptions.monthLabel = value;
             else if (key == "label.week") newOptions.weekLabel = value;
+            else if (key == "label.day_of_year") newOptions.dayOfYearLabel = value;
             else if (key == "label.date") newOptions.dateLabel = value;
             else if (key == "label.day") newOptions.dayLabel = value;
             else if (key == "label.time_info") newOptions.timeInfoLabel = value;
@@ -407,6 +408,7 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
             else if (key == "color.year") newColors.year = parseStyle(value);
             else if (key == "color.month") newColors.month = parseStyle(value);
             else if (key == "color.week_number") newColors.weekNumber = parseStyle(value);
+            else if (key == "color.day_of_year") newColors.dayOfYear = parseStyle(value);
             else if (key == "color.date") newColors.date = parseStyle(value);
             else if (key == "color.day_name") newColors.dayName = parseStyle(value);
             else if (key == "color.weekend") newColors.weekend = parseStyle(value);
@@ -517,9 +519,10 @@ void RCalHeaderFramework::ensureViewport(WINDOW* window, int left) {
     getmaxyx(window, windowHeight, windowWidth);
     (void)windowHeight;
 
-    const std::array<std::string, 6> labels{{
+    const std::array<std::string, 7> labels{{
         options_.yearLabel, options_.monthLabel, options_.weekLabel,
-        options_.dateLabel, options_.dayLabel, options_.timeInfoLabel
+        options_.dayOfYearLabel, options_.dateLabel, options_.dayLabel,
+        options_.timeInfoLabel
     }};
     std::size_t labelWidth = 1;
     for (const auto& label : labels) labelWidth = std::max(labelWidth, label.size());
@@ -645,15 +648,16 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
     if (has_colors()) { start_color(); use_default_colors(); }
     StyleRegistry styles;
     const unsigned width = options_.cellWidth;
-    const std::array<std::string, 6> labels{{
+    const std::array<std::string, 7> labels{{
         options_.yearLabel, options_.monthLabel, options_.weekLabel,
-        options_.dateLabel, options_.dayLabel, options_.timeInfoLabel
+        options_.dayOfYearLabel, options_.dateLabel, options_.dayLabel,
+        options_.timeInfoLabel
     }};
     std::size_t labelWidth = 1;
     for (const auto& label : labels) labelWidth = std::max(labelWidth, label.size());
     const int firstCell = left + static_cast<int>(labelWidth) + 1;
 
-    for (int row = 0; row < 6; ++row) {
+    for (int row = 0; row < 7; ++row) {
         put(window, top + row, left, labels[static_cast<std::size_t>(row)],
             styles.attributes(colors_.label));
         if (options_.showGrid)
@@ -713,6 +717,9 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
         const bool isToday = sameDate(day.date, today);
         const bool isSelected = i == selectedDayIndex_;
         const bool isHoliday = !day.holidayName.empty();
+        const ColorStyle& dayOfYearStyle = isToday ? colors_.currentDay
+            : (isSelected ? colors_.selectedDay
+            : (isHoliday ? colors_.holiday : colors_.dayOfYear));
         const ColorStyle& dateStyle = isToday ? colors_.currentDay
             : (isSelected ? colors_.selectedDay
             : (isHoliday ? colors_.holiday : colors_.date));
@@ -723,12 +730,13 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
         const ColorStyle& infoStyle = isToday ? colors_.currentDay
             : (isSelected ? colors_.selectedDay
             : (isHoliday ? colors_.holiday : colors_.timeInfo));
-        put(window, top + 3, x, centered(std::to_string(day.date.day), width), styles.attributes(dateStyle));
-        put(window, top + 4, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));
-        put(window, top + 5, x, centered(options_.timeInfo, width), styles.attributes(infoStyle));
+        put(window, top + 3, x, centered(std::to_string(day.dayOfYear), width), styles.attributes(dayOfYearStyle));
+        put(window, top + 4, x, centered(std::to_string(day.date.day), width), styles.attributes(dateStyle));
+        put(window, top + 5, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));
+        put(window, top + 6, x, centered(options_.timeInfo, width), styles.attributes(infoStyle));
         if (options_.showGrid) {
             const int separator = x + static_cast<int>(width);
-            for (int row = 3; row < 6; ++row)
+            for (int row = 3; row < 7; ++row)
                 put(window, top + row, separator, "|", styles.attributes(colors_.grid));
         }
     }
@@ -736,14 +744,14 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
     const std::string& selectedHoliday = selectedHolidayName();
     if (!selectedHoliday.empty()) {
         const int available = std::max(0, windowWidth - firstCell);
-        put(window, top + 5, firstCell, std::string(static_cast<std::size_t>(available), ' '),
+        put(window, top + 6, firstCell, std::string(static_cast<std::size_t>(available), ' '),
             styles.attributes(colors_.timeInfo));
         const std::string explanation = options_.holidayInfoPrefix.empty()
             ? selectedHoliday : options_.holidayInfoPrefix + ": " + selectedHoliday;
-        put(window, top + 5, firstCell, explanation, styles.attributes(colors_.holiday));
+        put(window, top + 6, firstCell, explanation, styles.attributes(colors_.holiday));
     }
     wattrset(window, A_NORMAL);
-    return std::min(6, windowHeight - top);
+    return std::min(7, windowHeight - top);
 }
 
 } // namespace rcal

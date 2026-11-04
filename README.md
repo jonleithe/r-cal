@@ -1,8 +1,8 @@
 # r-cal
 
 A C and C++ terminal calendar project. The first component is a configurable
-ncurses timeline header with grouped year, month, and ISO-week rows plus date,
-day-name, and time-information rows.
+ncurses timeline header with grouped year, month, and ISO-week rows plus day of
+year (DOY), date, day-name, and time-information rows.
 
 ## Build and test
 
@@ -25,7 +25,8 @@ Alternatively, use the project build wrapper:
 ```
 
 Debug and Release outputs are kept separately in `build/debug` and
-`build/release`.
+`build/release`. After a successful build, `build/r-cal` points to the selected
+configuration; `all` selects the Release executable.
 
 Run the interactive example from the repository root:
 

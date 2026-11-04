@@ -36,6 +36,7 @@ struct HeaderColors{
     ColorStyle year;
     ColorStyle month;
     ColorStyle weekNumber;
+    ColorStyle dayOfYear;
     ColorStyle date;
     ColorStyle dayName;
     ColorStyle weekend;
@@ -70,6 +71,7 @@ struct HeaderOptions{
     std::string yearLabel       = "Year";
     std::string monthLabel      = "Month";
     std::string weekLabel       = "Week";
+    std::string dayOfYearLabel  = "DOY";
     std::string dateLabel       = "Date";
     std::string dayLabel        = "Day";
     std::string timeInfoLabel   = "Info";
