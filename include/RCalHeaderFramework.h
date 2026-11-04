@@ -8,23 +8,30 @@
 struct _win_st;
 typedef struct _win_st WINDOW;
 
-namespace rcal {
+namespace rcal{
 
-struct Date {
-    int year = 1970;
-    unsigned month = 1;
-    unsigned day = 1;
+
+
+struct Date{
+    int year        = 1970;
+    unsigned month  = 1;
+    unsigned day    = 1;
 };
 
-struct ColorStyle {
+
+
+struct ColorStyle{
     std::string foreground = "default";
     std::string background = "default";
-    bool bold = false;
-    bool underline = false;
-    bool reverse = false;
+
+    bool bold       = false;
+    bool underline  = false;
+    bool reverse    = false;
 };
 
-struct HeaderColors {
+
+
+struct HeaderColors{
     ColorStyle label;
     ColorStyle year;
     ColorStyle month;
@@ -32,39 +39,49 @@ struct HeaderColors {
     ColorStyle date;
     ColorStyle dayName;
     ColorStyle weekend;
+    ColorStyle currentDay{"black", "yellow", true, false, false};
     ColorStyle timeInfo;
     ColorStyle grid;
 };
 
-struct HeaderOptions {
+
+
+struct HeaderOptions{
     Date startDate;
     std::size_t dayCount = 31;
     unsigned cellWidth = 4;
     bool showGrid = true;
     std::string timeInfo;
+
     std::array<std::string, 12> monthNames{{
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
     }};
+
     std::array<std::string, 7> dayNames{{
         "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
     }};
-    std::string yearLabel = "Year";
-    std::string monthLabel = "Month";
-    std::string weekLabel = "Week";
-    std::string dateLabel = "Date";
-    std::string dayLabel = "Day";
-    std::string timeInfoLabel = "Info";
+
+    std::string yearLabel       = "Year";
+    std::string monthLabel      = "Month";
+    std::string weekLabel       = "Week";
+    std::string dateLabel       = "Date";
+    std::string dayLabel        = "Day";
+    std::string timeInfoLabel   = "Info";
 };
 
-struct TimelineDay {
+
+
+struct TimelineDay{
     Date date;
-    unsigned dayOfYear = 1;
-    unsigned isoWeek = 1;
+    unsigned dayOfYear  = 1;
+    unsigned isoWeek    = 1;
     unsigned isoWeekday = 1;
 };
 
-class RCalHeaderFramework {
+
+
+class RCalHeaderFramework{
 public:
     RCalHeaderFramework();
     explicit RCalHeaderFramework(HeaderOptions options);

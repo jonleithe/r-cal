@@ -22,6 +22,8 @@ int main() {
     const auto configured = rcal::RCalHeaderFramework::fromConfigFile(
         std::string(RCAL_SOURCE_DIR) + "/config/rcal.conf.example");
     assert(configured.timeline().size() == 42);
-    assert(configured.options().startDate.year == 2026);
     assert(configured.colors().weekend.foreground == "red");
+    assert(configured.colors().currentDay.foreground == "black");
+    assert(configured.colors().currentDay.background == "yellow");
+    assert(configured.colors().currentDay.bold);
 }

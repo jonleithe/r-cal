@@ -5,6 +5,12 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Current day highlighting added
+
+- The curses renderer hides the terminal cursor and highlights the current
+  local date across its date, day-name, and time-information cells.
+- The highlight is configurable through `color.current_day`.
+
 ### Application entry point promoted
 
 - Moved the executable entry point from the examples directory to the project

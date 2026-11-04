@@ -23,7 +23,10 @@ Run the interactive example from the repository root:
 
 Press any key to exit. Copy `config/rcal.conf.example` and edit its labels,
 localized names, range, layout, and `color.*` settings to customize the header.
+`start_date` accepts either an ISO date (`YYYY-MM-DD`) or `today`.
 
 Colors use `foreground,background` syntax followed by optional `bold`,
 `underline`, or `reverse` attributes. The eight standard curses color names,
-`default`, and numeric terminal color IDs are supported.
+`default`, and numeric terminal color IDs are supported. The current date is
+highlighted with `color.current_day`, and the cursor is hidden while the header
+is displayed.

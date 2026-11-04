@@ -1,13 +1,13 @@
 # Timeline range and layout
-start_date=2026-01-01
+start_date=today
 days=42
 cell_width=4
 show_grid=true
 time_info=
 
 # Localization. Lists require 12 months and 7 days (Monday first).
-month_names=January,February,March,April,May,June,July,August,September,October,November,December
-day_names=Mon,Tue,Wed,Thu,Fri,Sat,Sun
+month_names=Januar,February,Mars,April,May,June,July,August,September,October,November,December
+day_names=Mon,Tue,Ons,Thu,Fri,Sat,Sun
 
 label.year=Year
 label.month=Month
@@ -25,5 +25,6 @@ color.week_number=green,default
 color.date=white,default
 color.day_name=white,default
 color.weekend=red,default
+color.current_day=black,yellow,bold
 color.time_info=magenta,default
 color.grid=blue,default

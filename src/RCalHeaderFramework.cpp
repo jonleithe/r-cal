@@ -6,6 +6,7 @@
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
+#include <ctime>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -138,6 +139,22 @@ unsigned isoWeek(const Date& date, unsigned weekday) {
     return static_cast<unsigned>(week);
 }
 
+Date currentLocalDate() {
+    const std::time_t now = std::time(nullptr);
+    std::tm local{};
+#if defined(_WIN32)
+    localtime_s(&local, &now);
+#else
+    localtime_r(&now, &local);
+#endif
+    return {local.tm_year + 1900, static_cast<unsigned>(local.tm_mon + 1),
+            static_cast<unsigned>(local.tm_mday)};
+}
+
+bool sameDate(const Date& left, const Date& right) {
+    return left.year == right.year && left.month == right.month && left.day == right.day;
+}
+
 ColorStyle parseStyle(const std::string& value) {
     const auto parts = split(value, ',');
     ColorStyle style;
@@ -244,7 +261,8 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
         const std::string key = lower(trim(clean.substr(0, equals)));
         const std::string value = trim(clean.substr(equals + 1));
         try {
-            if (key == "start_date") newOptions.startDate = parseDate(value);
+            if (key == "start_date") newOptions.startDate =
+                lower(value) == "today" ? currentLocalDate() : parseDate(value);
             else if (key == "days") newOptions.dayCount =
                 static_cast<std::size_t>(parseLong(value, key, 1, 3660));
             else if (key == "cell_width") newOptions.cellWidth =
@@ -272,6 +290,7 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
             else if (key == "color.date") newColors.date = parseStyle(value);
             else if (key == "color.day_name") newColors.dayName = parseStyle(value);
             else if (key == "color.weekend") newColors.weekend = parseStyle(value);
+            else if (key == "color.current_day") newColors.currentDay = parseStyle(value);
             else if (key == "color.time_info") newColors.timeInfo = parseStyle(value);
             else if (key == "color.grid") newColors.grid = parseStyle(value);
             else throw std::runtime_error("unknown setting '" + key + "'");
@@ -321,6 +340,7 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
     getmaxyx(window, windowHeight, windowWidth);
     if (top >= windowHeight || left >= windowWidth) return 0;
 
+    curs_set(0);
     if (has_colors()) { start_color(); use_default_colors(); }
     StyleRegistry styles;
     const unsigned width = options_.cellWidth;
@@ -380,14 +400,19 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) const {
     renderSpans(1, months, colors_.month);
     renderSpans(2, weeks, colors_.weekNumber);
 
+    const Date today = currentLocalDate();
     for (std::size_t i = 0; i < timeline_.size(); ++i) {
         const auto& day = timeline_[i];
         const int x = firstCell + static_cast<int>(i * stride);
         if (x >= windowWidth) break;
-        const ColorStyle& dayStyle = day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName;
-        put(window, top + 3, x, centered(std::to_string(day.date.day), width), styles.attributes(colors_.date));
+        const bool isToday = sameDate(day.date, today);
+        const ColorStyle& dateStyle = isToday ? colors_.currentDay : colors_.date;
+        const ColorStyle& dayStyle = isToday ? colors_.currentDay
+            : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName);
+        const ColorStyle& infoStyle = isToday ? colors_.currentDay : colors_.timeInfo;
+        put(window, top + 3, x, centered(std::to_string(day.date.day), width), styles.attributes(dateStyle));
         put(window, top + 4, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));
-        put(window, top + 5, x, centered(options_.timeInfo, width), styles.attributes(colors_.timeInfo));
+        put(window, top + 5, x, centered(options_.timeInfo, width), styles.attributes(infoStyle));
         if (options_.showGrid) {
             const int separator = x + static_cast<int>(width);
             for (int row = 3; row < 6; ++row)
