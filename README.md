@@ -56,9 +56,11 @@ days remain. These values are configured with `buffer_days` and
 - Home or `t`: return to today.
 - `q`, `Q`, or Escape: quit.
 
-Today remains highlighted with `color.current_day`; a different selected date
-uses `color.selected_day`. Resizing the terminal recalculates the number of
-visible days and keeps the selected date centered.
+Today is highlighted with `color.current_day`, while the selected date uses
+`color.selected_day`. Selection styling takes precedence when today is selected;
+the current-day styling returns as soon as selection moves away. Resizing the
+terminal recalculates the number of visible days and keeps the selected date
+centered.
 
 ## Norwegian holidays
 

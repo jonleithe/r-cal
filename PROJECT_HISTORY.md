@@ -5,6 +5,11 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-04
 
+### Selection highlight precedence corrected
+
+- Selected-day styling now takes precedence over current-day styling, keeping
+  navigation feedback visible when the selected date reaches today.
+
 ### Day-of-year row added
 
 - Added a DOY row between Week and Date using the timeline's existing ordinal

@@ -717,18 +717,18 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
         const bool isToday = sameDate(day.date, today);
         const bool isSelected = i == selectedDayIndex_;
         const bool isHoliday = !day.holidayName.empty();
-        const ColorStyle& dayOfYearStyle = isToday ? colors_.currentDay
-            : (isSelected ? colors_.selectedDay
+        const ColorStyle& dayOfYearStyle = isSelected ? colors_.selectedDay
+            : (isToday ? colors_.currentDay
             : (isHoliday ? colors_.holiday : colors_.dayOfYear));
-        const ColorStyle& dateStyle = isToday ? colors_.currentDay
-            : (isSelected ? colors_.selectedDay
+        const ColorStyle& dateStyle = isSelected ? colors_.selectedDay
+            : (isToday ? colors_.currentDay
             : (isHoliday ? colors_.holiday : colors_.date));
-        const ColorStyle& dayStyle = isToday ? colors_.currentDay
-            : (isSelected ? colors_.selectedDay
+        const ColorStyle& dayStyle = isSelected ? colors_.selectedDay
+            : (isToday ? colors_.currentDay
             : (isHoliday ? colors_.holiday
             : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName)));
-        const ColorStyle& infoStyle = isToday ? colors_.currentDay
-            : (isSelected ? colors_.selectedDay
+        const ColorStyle& infoStyle = isSelected ? colors_.selectedDay
+            : (isToday ? colors_.currentDay
             : (isHoliday ? colors_.holiday : colors_.timeInfo));
         put(window, top + 3, x, centered(std::to_string(day.dayOfYear), width), styles.attributes(dayOfYearStyle));
         put(window, top + 4, x, centered(std::to_string(day.date.day), width), styles.attributes(dateStyle));
