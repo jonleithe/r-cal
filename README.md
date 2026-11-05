@@ -115,6 +115,12 @@ as empty removes it. Notes are UTF-8 text, including Norwegian characters.
 The create-item chooser also reserves Task and Event entries. Their editors
 are not implemented yet and are labelled accordingly in the menu.
 
+## Persistence
+
+User-entered data is currently held in memory. The planned local-first SQLite
+backend, storage abstraction, schema, test strategy, and future synchronization
+options are documented in [docs/PERSISTENCE_PLAN.md](docs/PERSISTENCE_PLAN.md).
+
 ## Norwegian holidays
 
 Set `holiday_country=NO` to highlight Norway's named public holidays with

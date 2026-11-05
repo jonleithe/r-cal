@@ -5,6 +5,13 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-05
 
+### Local-first persistence direction documented
+
+- Chose SQLite as the initial embedded persistence backend, isolated behind a
+  `CalendarStore` interface rather than coupled to the TUI or calendar model.
+- Documented the proposed schema, XDG data location, migrations, tests, and a
+  path toward later export and multi-device synchronization.
+
 ### Navigable day notes added
 
 - Replaced the note-presence flag with multiple independent UTF-8 note entries
