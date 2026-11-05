@@ -16,21 +16,27 @@
 
 #include <curses.h>
 
-namespace rcal {
-namespace {
+namespace rcal{
+namespace{
 
-std::string trim(std::string value) {
+std::string trim(std::string value){
     const auto first = value.find_first_not_of(" \t\r\n");
     if (first == std::string::npos) return {};
     const auto last = value.find_last_not_of(" \t\r\n");
     return value.substr(first, last - first + 1);
 }
+// ——— End of trim() ———————————————————————————————————————————————————————————
+
+
 
 std::string lower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return value;
 }
+// ——— End of lower() ——————————————————————————————————————————————————————————
+
+
 
 std::vector<std::string> split(const std::string& value, char delimiter) {
     std::vector<std::string> result;
@@ -39,6 +45,7 @@ std::vector<std::string> split(const std::string& value, char delimiter) {
     while (std::getline(input, item, delimiter)) result.push_back(trim(item));
     return result;
 }
+// ——— End of split() ——————————————————————————————————————————————————————————
 
 long parseLong(const std::string& value, const std::string& key, long minimum,
                long maximum) {
@@ -51,6 +58,7 @@ long parseLong(const std::string& value, const std::string& key, long minimum,
     }
     return number;
 }
+// ——— End of parseLong() ——————————————————————————————————————————————————————
 
 bool parseBool(const std::string& value, const std::string& key) {
     const std::string normalized = lower(trim(value));
@@ -58,6 +66,7 @@ bool parseBool(const std::string& value, const std::string& key) {
     if (normalized == "false" || normalized == "no" || normalized == "0") return false;
     throw std::runtime_error("invalid boolean for '" + key + "': " + value);
 }
+// ——— End of parseBool() ——————————————————————————————————————————————————————
 
 Date parseDate(const std::string& value) {
     const auto parts = split(value, '-');
@@ -68,10 +77,12 @@ Date parseDate(const std::string& value) {
         static_cast<unsigned>(parseLong(parts[2], "start_date day", 1, 31))
     };
 }
+// ——— End of parseDate() ——————————————————————————————————————————————————————
 
 bool leapYear(int year) {
     return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 }
+// ——— End of leapYear() ———————————————————————————————————————————————————————
 
 unsigned daysInMonth(int year, unsigned month) {
     static constexpr std::array<unsigned, 12> days{{
@@ -79,6 +90,7 @@ unsigned daysInMonth(int year, unsigned month) {
     }};
     return days.at(month - 1) + (month == 2 && leapYear(year) ? 1U : 0U);
 }
+// ——— End of daysInMonth() ————————————————————————————————————————————————————
 
 void validateDate(const Date& date) {
     if (date.year < 1 || date.year > 9999 || date.month < 1 || date.month > 12 ||
@@ -86,6 +98,7 @@ void validateDate(const Date& date) {
         throw std::runtime_error("invalid calendar date");
     }
 }
+// ——— End of validateDate() ———————————————————————————————————————————————————
 
 long long daysFromCivil(int year, unsigned month, unsigned day) {
     year -= month <= 2;
@@ -97,6 +110,7 @@ long long daysFromCivil(int year, unsigned month, unsigned day) {
                               dayOfYear;
     return static_cast<long long>(era) * 146097 + dayOfEra - 719468;
 }
+// ——— End of daysFromCivil() ——————————————————————————————————————————————————
 
 Date civilFromDays(long long days) {
     days += 719468;
@@ -113,12 +127,14 @@ Date civilFromDays(long long days) {
     year += month <= 2;
     return {year, month, day};
 }
+// ——— End of civilFromDays() ——————————————————————————————————————————————————
 
 unsigned isoWeekday(long long days) {
     long long weekday = (days + 3) % 7;
     if (weekday < 0) weekday += 7;
     return static_cast<unsigned>(weekday + 1);
 }
+// ——— End of isoWeekday() —————————————————————————————————————————————————————
 
 unsigned ordinalDay(const Date& date) {
     static constexpr std::array<unsigned, 12> offsets{{
@@ -127,11 +143,13 @@ unsigned ordinalDay(const Date& date) {
     return offsets[date.month - 1] + date.day +
            (date.month > 2 && leapYear(date.year) ? 1U : 0U);
 }
+// ——— End of ordinalDay() —————————————————————————————————————————————————————
 
 unsigned isoWeeksInYear(int year) {
     const unsigned jan1 = isoWeekday(daysFromCivil(year, 1, 1));
     return jan1 == 4 || (jan1 == 3 && leapYear(year)) ? 53U : 52U;
 }
+// ——— End of isoWeeksInYear() —————————————————————————————————————————————————
 
 unsigned isoWeek(const Date& date, unsigned weekday) {
     int week = (static_cast<int>(ordinalDay(date)) - static_cast<int>(weekday) + 10) / 7;
@@ -139,6 +157,7 @@ unsigned isoWeek(const Date& date, unsigned weekday) {
     if (week > static_cast<int>(isoWeeksInYear(date.year))) return 1;
     return static_cast<unsigned>(week);
 }
+// ——— End of isoWeek() ————————————————————————————————————————————————————————
 
 Date currentLocalDate() {
     const std::time_t now = std::time(nullptr);
@@ -151,14 +170,17 @@ Date currentLocalDate() {
     return {local.tm_year + 1900, static_cast<unsigned>(local.tm_mon + 1),
             static_cast<unsigned>(local.tm_mday)};
 }
+// ——— End of currentLocalDate() ———————————————————————————————————————————————
 
 bool sameDate(const Date& left, const Date& right) {
     return left.year == right.year && left.month == right.month && left.day == right.day;
 }
+// ——— End of sameDate() ———————————————————————————————————————————————————————
 
 Date addDays(const Date& date, long long days) {
     return civilFromDays(daysFromCivil(date.year, date.month, date.day) + days);
 }
+// ——— End of addDays() ————————————————————————————————————————————————————————
 
 Date gregorianEasterSunday(int year) {
     const int a = year % 19;
@@ -177,6 +199,7 @@ Date gregorianEasterSunday(int year) {
     const unsigned day = static_cast<unsigned>((h + l - 7 * m + 114) % 31 + 1);
     return {year, month, day};
 }
+// ——— End of gregorianEasterSunday() ——————————————————————————————————————————
 
 std::string norwegianHolidayName(const Date& date) {
     if (date.month == 1 && date.day == 1) return "Nyttårsdag";
@@ -199,11 +222,13 @@ std::string norwegianHolidayName(const Date& date) {
         default: return {};
     }
 }
+// ——— End of norwegianHolidayName() ———————————————————————————————————————————
 
 std::string holidayName(const Date& date, const std::string& country) {
     if (lower(country) == "no") return norwegianHolidayName(date);
     return {};
 }
+// ——— End of holidayName() ————————————————————————————————————————————————————
 
 ColorStyle parseStyle(const std::string& value) {
     const auto parts = split(value, ',');
@@ -219,6 +244,7 @@ ColorStyle parseStyle(const std::string& value) {
     }
     return style;
 }
+// ——— End of parseStyle() —————————————————————————————————————————————————————
 
 ColorStyle selectedStyle(const ColorStyle& base, const ColorStyle& highlight) {
     ColorStyle result = base;
@@ -228,6 +254,7 @@ ColorStyle selectedStyle(const ColorStyle& base, const ColorStyle& highlight) {
     result.reverse = result.reverse || highlight.reverse;
     return result;
 }
+// ——— End of selectedStyle() ——————————————————————————————————————————————————
 
 short cursesColor(const std::string& name) {
     static const std::map<std::string, short> names{{
@@ -239,6 +266,7 @@ short cursesColor(const std::string& name) {
     if (found != names.end()) return found->second;
     return static_cast<short>(parseLong(name, "color", 0, SHRT_MAX));
 }
+// ——— End of cursesColor() ————————————————————————————————————————————————————
 
 struct StyleRegistry {
     short nextPair = 1;
@@ -261,12 +289,14 @@ struct StyleRegistry {
         }
         return result | COLOR_PAIR(found->second);
     }
+    // ——— End of attributes() —————————————————————————————————————————————————
 };
 
 int characterWidth(wchar_t character) {
     const int width = ::wcwidth(character);
     return width < 0 ? 1 : width;
 }
+// ——— End of characterWidth() —————————————————————————————————————————————————
 
 std::wstring toWide(const std::string& text) {
     std::wstring result;
@@ -288,6 +318,7 @@ std::wstring toWide(const std::string& text) {
     }
     return result;
 }
+// ——— End of toWide() —————————————————————————————————————————————————————————
 
 std::wstring fitToWidth(const std::wstring& text, unsigned width) {
     std::wstring result;
@@ -300,6 +331,7 @@ std::wstring fitToWidth(const std::wstring& text, unsigned width) {
     }
     return result;
 }
+// ——— End of fitToWidth() —————————————————————————————————————————————————————
 
 unsigned displayWidth(const std::wstring& text) {
     unsigned result = 0;
@@ -307,6 +339,7 @@ unsigned displayWidth(const std::wstring& text) {
         result += static_cast<unsigned>(characterWidth(character));
     return result;
 }
+// ——— End of displayWidth() ———————————————————————————————————————————————————
 
 std::wstring centered(const std::string& text, unsigned width) {
     const std::wstring fitted = fitToWidth(toWide(text), width);
@@ -315,6 +348,7 @@ std::wstring centered(const std::string& text, unsigned width) {
     return std::wstring(left, L' ') + fitted +
            std::wstring(width - left - textWidth, L' ');
 }
+// ——— End of centered() ———————————————————————————————————————————————————————
 
 void put(WINDOW* window, int y, int x, const std::wstring& text, attr_t attributes) {
     int windowHeight = 0;
@@ -338,27 +372,33 @@ void put(WINDOW* window, int y, int x, const std::wstring& text, attr_t attribut
     wattrset(window, attributes);
     mvwaddnwstr(window, y, x, visible.c_str(), static_cast<int>(visible.size()));
 }
+// ——— End of put() ————————————————————————————————————————————————————————————
 
 void put(WINDOW* window, int y, int x, const std::string& text, attr_t attributes) {
     put(window, y, x, toWide(text), attributes);
 }
+// ——— End of put() ————————————————————————————————————————————————————————————
 
 } // namespace
 
 ColorStyle highlightedStyle(const ColorStyle& base, const ColorStyle& highlight) {
     return selectedStyle(base, highlight);
 }
+// ——— End of highlightedStyle() ———————————————————————————————————————————————
 
 RCalHeaderFramework::RCalHeaderFramework() { rebuildTimeline(); }
+// ——— End of RCalHeaderFramework() ————————————————————————————————————————————
 
 RCalHeaderFramework::RCalHeaderFramework(HeaderOptions options)
     : options_(std::move(options)) { rebuildTimeline(); }
+// ——— End of RCalHeaderFramework() ————————————————————————————————————————————
 
 RCalHeaderFramework RCalHeaderFramework::fromConfigFile(const std::string& path) {
     RCalHeaderFramework result;
     result.loadConfigFile(path);
     return result;
 }
+// ——— End of fromConfigFile() —————————————————————————————————————————————————
 
 void RCalHeaderFramework::loadConfigFile(const std::string& path) {
     std::ifstream input(path);
@@ -438,21 +478,29 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
     colors_ = std::move(newColors);
     rebuildTimeline();
 }
+// ——— End of loadConfigFile() —————————————————————————————————————————————————
 
 
 
 const HeaderOptions& RCalHeaderFramework::options() const noexcept { return options_; }
+// ——— End of options() ————————————————————————————————————————————————————————
 const HeaderColors& RCalHeaderFramework::colors() const noexcept { return colors_; }
+// ——— End of colors() —————————————————————————————————————————————————————————
 const std::vector<TimelineDay>& RCalHeaderFramework::timeline() const noexcept { return timeline_; }
+// ——— End of timeline() ———————————————————————————————————————————————————————
 const Date& RCalHeaderFramework::selectedDate() const noexcept { return selectedDate_; }
+// ——— End of selectedDate() ———————————————————————————————————————————————————
 const std::string& RCalHeaderFramework::selectedHolidayName() const noexcept {
     static const std::string empty;
     if (selectedDayIndex_ >= timeline_.size()) return empty;
     const auto& selected = timeline_[selectedDayIndex_];
     return sameDate(selected.date, selectedDate_) ? selected.holidayName : empty;
 }
+// ——— End of selectedHolidayName() ————————————————————————————————————————————
 std::size_t RCalHeaderFramework::firstVisibleDay() const noexcept { return firstVisibleDay_; }
+// ——— End of firstVisibleDay() ————————————————————————————————————————————————
 std::size_t RCalHeaderFramework::visibleDayCount() const noexcept { return visibleDayCount_; }
+// ——— End of visibleDayCount() ————————————————————————————————————————————————
 
 
 
@@ -460,6 +508,7 @@ const DayInfo* RCalHeaderFramework::dayInfo(Date date) const noexcept {
     const auto found = dayInformation_.find(daysFromCivil(date.year, date.month, date.day));
     return found == dayInformation_.end() ? nullptr : &found->second;
 }
+// ——— End of dayInfo() ————————————————————————————————————————————————————————
 
 
 
@@ -484,6 +533,7 @@ std::string RCalHeaderFramework::infoIndicator(Date date) const {
     if (!holidayName(date, options_.holidayCountry).empty()) result[1] = 'H';
     return result;
 }
+// ——— End of infoIndicator() ——————————————————————————————————————————————————
 
 
 
@@ -491,6 +541,7 @@ void RCalHeaderFramework::setOptions(HeaderOptions options) {
     options_ = std::move(options);
     rebuildTimeline();
 }
+// ——— End of setOptions() —————————————————————————————————————————————————————
 
 
 
@@ -498,6 +549,7 @@ void RCalHeaderFramework::setColors(HeaderColors colors)
 {
     colors_ = std::move(colors);
 }
+// ——— End of setColors() ——————————————————————————————————————————————————————
 
 
 
@@ -505,6 +557,7 @@ void RCalHeaderFramework::setDayInfo(Date date, DayInfo info) {
     validateDate(date);
     dayInformation_[daysFromCivil(date.year, date.month, date.day)] = info;
 }
+// ——— End of setDayInfo() —————————————————————————————————————————————————————
 
 
 
@@ -512,6 +565,7 @@ bool RCalHeaderFramework::removeDayInfo(Date date) {
     validateDate(date);
     return dayInformation_.erase(daysFromCivil(date.year, date.month, date.day)) > 0;
 }
+// ——— End of removeDayInfo() ——————————————————————————————————————————————————
 
 
 
@@ -539,6 +593,7 @@ void RCalHeaderFramework::rebuildTimeline() {
     visibleDayCount_ = 0;
     viewportInitialized_ = false;
 }
+// ——— End of rebuildTimeline() ————————————————————————————————————————————————
 
 
 
@@ -567,6 +622,7 @@ void RCalHeaderFramework::rebuildBufferedTimeline(Date selected, std::size_t vis
     visibleDayCount_ = visibleDays;
     viewportInitialized_ = true;
 }
+// ——— End of rebuildBufferedTimeline() ————————————————————————————————————————
 
 
 
@@ -598,15 +654,18 @@ void RCalHeaderFramework::ensureViewport(WINDOW* window, int left) {
         rebuildBufferedTimeline(selectedDate_, visibleDays, visibleDays / 2);
     }
 }
+// ——— End of ensureViewport() —————————————————————————————————————————————————
 
 
 
-void RCalHeaderFramework::moveSelection(int days) {
+void RCalHeaderFramework::moveSelection(int days)
+{    
     if (days == 0) return;
+
     const Date moved = addDays(selectedDate_, days);
     validateDate(moved);
 
-    if (!viewportInitialized_ || visibleDayCount_ == 0) {
+    if (!viewportInitialized_ || visibleDayCount_ == 0){
         const long long candidate = static_cast<long long>(selectedDayIndex_) + days;
         if (candidate >= 0 && candidate < static_cast<long long>(timeline_.size())) {
             selectedDayIndex_ = static_cast<std::size_t>(candidate);
@@ -641,6 +700,7 @@ void RCalHeaderFramework::moveSelection(int days) {
         rebuildBufferedTimeline(selectedDate_, visibleDayCount_, selectedOffset);
     }
 }
+// ——— End of moveSelection() ——————————————————————————————————————————————————
 
 
 
@@ -652,6 +712,7 @@ void RCalHeaderFramework::selectDate(Date date) {
     else
         options_.startDate = date;
 }
+// ——— End of selectDate() —————————————————————————————————————————————————————
 
 
 
@@ -687,6 +748,7 @@ InputResult RCalHeaderFramework::handleInput(int key, WINDOW* window) {
             return InputResult::ignored;
     }
 }
+// ——— End of handleInput() ————————————————————————————————————————————————————
 
 
 
@@ -816,5 +878,9 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
     wattrset(window, A_NORMAL);
     return std::min(8, windowHeight - top);
 }
+// ——— End of render() —————————————————————————————————————————————————————————
 
-} // namespace rcal
+
+
+}
+// End of namespace rcal ———————————————————————————————————————————————————————
