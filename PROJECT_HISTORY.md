@@ -5,6 +5,34 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-05
 
+### Navigable day notes added
+
+- Replaced the note-presence flag with multiple independent UTF-8 note entries
+  stored in each date's `DayInfo`.
+- Notes render as navigable rows below the calendar; Insert opens a shared
+  Note/Task/Event creation chooser, Up/Down selects a note, and Enter edits it.
+- Note creation is active now; Task and Event entries reserve the interaction
+  for their future editors.
+
+### Keyboard work-status editing added
+
+- Added lowercase `w`, `t`, `o`, `a`, and `f` shortcuts to toggle the selected
+  date's work status, with Space available to clear it.
+- Added vacation (ferie) as a first-class work status represented by `F`.
+
+### Selected-day status bar added
+
+- Added a bottom status bar that expands the selected date's compact Info codes
+  into work, holiday, note, task, and event descriptions.
+- Added `color.status_bar` and exposed it through the interactive color selector.
+
+### Interactive color selector added
+
+- Added a `c`-key modal editor for every configurable foreground, background,
+  and text attribute exposed by the active terminal.
+- Saving updates the loaded configuration file; cancelling leaves both the
+  running palette and file unchanged.
+
 ### Persistent day-color highlights
 
 - Current-day and selected-day highlights retain the ordinary foreground color

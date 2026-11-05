@@ -1,13 +1,4 @@
 
-#Updated the scheme: day colors now persist under both current-day and selected-day highlights.
-#Weekend/holiday text remains red.
-#Current day uses the blue background.
-#Selected day uses the yellow background and bold emphasis.
-#If current and selected are the same day, yellow selection wins.
-#I also changed the example highlight settings to default,blue and default,yellow,bold, since highlight foregrounds are intentionally preserved from the normal day style. Updated [renderer (line 249)](/home/jole/projects/r-cal/src/RCalHeaderFramework.cpp:249), [config (line 35)](/home/jole/projects/r-cal/config/rcal.conf.example:35), and [README (line 59)](/home/jole/projects/r-cal/README.md:59).
-#Debug and Release tests pass.
-
-
 # Timeline range and layout
 start_date=today
 buffer_days=90
@@ -32,9 +23,9 @@ label.holiday_info=Helligdag
 
 # Syntax: foreground,background[,bold][,underline][,reverse]
 # Use basic color names or numeric IDs supported by the terminal.
-color.label=white,default,bold
+color.label=green,default,bold
 color.year=cyan,default
-color.month=yellow,default,bold
+color.month=white,default,bold
 color.week_number=green,default
 color.day_of_year=cyan,default
 color.date=white,default
@@ -44,9 +35,10 @@ color.holiday=red,default,bold
 
 # Current and selected highlights keep the ordinary day foreground. Their
 # background and attributes distinguish the highlighted cell.
-color.current_day=black,blue
+color.current_day=black,yellow,bold
 
-color.selected_day=black,yellow,bold
+color.selected_day=black,blue
 
-color.time_info=magenta,default
-color.grid=blue,default
+color.time_info=56,default
+color.grid=green,default
+color.status_bar=black,white

@@ -469,6 +469,7 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
             else if (key == "color.selected_day") newColors.selectedDay = parseStyle(value);
             else if (key == "color.time_info") newColors.timeInfo = parseStyle(value);
             else if (key == "color.grid") newColors.grid = parseStyle(value);
+            else if (key == "color.status_bar") newColors.statusBar = parseStyle(value);
             else throw std::runtime_error("unknown setting '" + key + "'");
         } catch (const std::exception& error) {
             throw std::runtime_error(path + ":" + std::to_string(lineNumber) + ": " + error.what());
@@ -510,6 +511,16 @@ const DayInfo* RCalHeaderFramework::dayInfo(Date date) const noexcept {
 }
 // ——— End of dayInfo() ————————————————————————————————————————————————————————
 
+const std::string* RCalHeaderFramework::selectedNote() const noexcept {
+    const DayInfo* info = dayInfo(selectedDate_);
+    return info && selectedNoteIndex_ < info->notes.size()
+        ? &info->notes[selectedNoteIndex_] : nullptr;
+}
+
+std::size_t RCalHeaderFramework::selectedNoteIndex() const noexcept {
+    return selectedNoteIndex_;
+}
+
 
 
 std::string RCalHeaderFramework::infoIndicator(Date date) const {
@@ -522,9 +533,10 @@ std::string RCalHeaderFramework::infoIndicator(Date date) const {
             case WorkStatus::travelling: result[0] = 'T'; break;
             case WorkStatus::outOfOfficeWorking: result[0] = 'O'; break;
             case WorkStatus::compensatoryLeave: result[0] = 'A'; break;
+            case WorkStatus::vacation: result[0] = 'F'; break;
             case WorkStatus::unspecified: break;
         }
-        if (info->hasNote) result[2] = 'N';
+        if (!info->notes.empty()) result[2] = 'N';
         if (info->taskCount > 0)
             result[3] = info->taskCount < 10
                 ? static_cast<char>('0' + info->taskCount) : '+';
@@ -534,6 +546,49 @@ std::string RCalHeaderFramework::infoIndicator(Date date) const {
     return result;
 }
 // ——— End of infoIndicator() ——————————————————————————————————————————————————
+
+
+
+std::string RCalHeaderFramework::infoDescription(Date date) const {
+    validateDate(date);
+    std::vector<std::string> details;
+    const DayInfo* info = dayInfo(date);
+    if (info) {
+        switch (info->workStatus) {
+            case WorkStatus::workday: details.push_back("W Workday"); break;
+            case WorkStatus::travelling: details.push_back("T Travelling"); break;
+            case WorkStatus::outOfOfficeWorking:
+                details.push_back("O Out-of-office working");
+                break;
+            case WorkStatus::compensatoryLeave:
+                details.push_back("A Compensatory leave");
+                break;
+            case WorkStatus::vacation: details.push_back("F Vacation"); break;
+            case WorkStatus::unspecified: break;
+        }
+    }
+
+    const std::string holiday = holidayName(date, options_.holidayCountry);
+    if (!holiday.empty()) details.push_back("H " + holiday);
+    if (info && info->notes.size() == 1) details.push_back("N " + info->notes.front());
+    else if (info && !info->notes.empty())
+        details.push_back("N " + std::to_string(info->notes.size()) + " notes");
+    if (info && info->taskCount > 0)
+        details.push_back(std::to_string(info->taskCount) +
+                          (info->taskCount == 1 ? " task" : " tasks"));
+    if (info && info->eventCount > 0)
+        details.push_back(std::to_string(info->eventCount) +
+                          (info->eventCount == 1 ? " event" : " events"));
+
+    if (details.empty()) return "No day information";
+    std::string result;
+    for (const std::string& detail : details) {
+        if (!result.empty()) result += " | ";
+        result += detail;
+    }
+    return result;
+}
+// ——— End of infoDescription() ———————————————————————————————————————————————
 
 
 
@@ -561,11 +616,84 @@ void RCalHeaderFramework::setDayInfo(Date date, DayInfo info) {
 
 
 
+void RCalHeaderFramework::addNote(Date date, std::string note) {
+    validateDate(date);
+    if (note.empty()) return;
+    DayInfo& info = dayInformation_[daysFromCivil(date.year, date.month, date.day)];
+    info.notes.push_back(std::move(note));
+    if (sameDate(date, selectedDate_)) selectedNoteIndex_ = info.notes.size() - 1;
+}
+// ——— End of addNote() ————————————————————————————————————————————————————————
+
+
+
+void RCalHeaderFramework::updateSelectedNote(std::string note) {
+    const long long key = daysFromCivil(selectedDate_.year, selectedDate_.month,
+                                        selectedDate_.day);
+    auto found = dayInformation_.find(key);
+    if (found == dayInformation_.end() || selectedNoteIndex_ >= found->second.notes.size())
+        return;
+    if (note.empty()) {
+        found->second.notes.erase(found->second.notes.begin() +
+                                 static_cast<std::ptrdiff_t>(selectedNoteIndex_));
+        if (selectedNoteIndex_ >= found->second.notes.size() && selectedNoteIndex_ > 0)
+            --selectedNoteIndex_;
+    } else {
+        found->second.notes[selectedNoteIndex_] = std::move(note);
+    }
+    const DayInfo& info = found->second;
+    if (info.workStatus == WorkStatus::unspecified && info.notes.empty() &&
+        info.taskCount == 0 && info.eventCount == 0)
+        dayInformation_.erase(found);
+}
+// ——— End of updateSelectedNote() —————————————————————————————————————————————
+
+
+
+void RCalHeaderFramework::moveNoteSelection(int rows) {
+    const DayInfo* info = dayInfo(selectedDate_);
+    if (!info || info->notes.empty() || rows == 0) return;
+    const long long candidate = static_cast<long long>(selectedNoteIndex_) + rows;
+    selectedNoteIndex_ = static_cast<std::size_t>(std::max(0LL, std::min(
+        static_cast<long long>(info->notes.size() - 1), candidate)));
+}
+// ——— End of moveNoteSelection() ——————————————————————————————————————————————
+
+
+
 bool RCalHeaderFramework::removeDayInfo(Date date) {
     validateDate(date);
     return dayInformation_.erase(daysFromCivil(date.year, date.month, date.day)) > 0;
 }
 // ——— End of removeDayInfo() ——————————————————————————————————————————————————
+
+
+
+void RCalHeaderFramework::toggleSelectedWorkStatus(WorkStatus status) {
+    if (status == WorkStatus::unspecified) {
+        clearSelectedWorkStatus();
+        return;
+    }
+    DayInfo info;
+    if (const DayInfo* existing = dayInfo(selectedDate_)) info = *existing;
+    info.workStatus = info.workStatus == status ? WorkStatus::unspecified : status;
+    setDayInfo(selectedDate_, info);
+}
+// ——— End of toggleSelectedWorkStatus() ———————————————————————————————————————
+
+
+
+void RCalHeaderFramework::clearSelectedWorkStatus() {
+    DayInfo* info = nullptr;
+    const auto found = dayInformation_.find(
+        daysFromCivil(selectedDate_.year, selectedDate_.month, selectedDate_.day));
+    if (found != dayInformation_.end()) info = &found->second;
+    if (!info) return;
+    info->workStatus = WorkStatus::unspecified;
+    if (info->notes.empty() && info->taskCount == 0 && info->eventCount == 0)
+        dayInformation_.erase(found);
+}
+// ——— End of clearSelectedWorkStatus() ————————————————————————————————————————
 
 
 
@@ -591,6 +719,7 @@ void RCalHeaderFramework::rebuildTimeline() {
     selectedDayIndex_ = 0;
     firstVisibleDay_ = 0;
     visibleDayCount_ = 0;
+    selectedNoteIndex_ = 0;
     viewportInitialized_ = false;
 }
 // ——— End of rebuildTimeline() ————————————————————————————————————————————————
@@ -664,6 +793,7 @@ void RCalHeaderFramework::moveSelection(int days)
 
     const Date moved = addDays(selectedDate_, days);
     validateDate(moved);
+    selectedNoteIndex_ = 0;
 
     if (!viewportInitialized_ || visibleDayCount_ == 0){
         const long long candidate = static_cast<long long>(selectedDayIndex_) + days;
@@ -707,6 +837,7 @@ void RCalHeaderFramework::moveSelection(int days)
 void RCalHeaderFramework::selectDate(Date date) {
     validateDate(date);
     selectedDate_ = date;
+    selectedNoteIndex_ = 0;
     if (viewportInitialized_ && visibleDayCount_ > 0)
         rebuildBufferedTimeline(date, visibleDayCount_, visibleDayCount_ / 2);
     else
@@ -719,16 +850,26 @@ void RCalHeaderFramework::selectDate(Date date) {
 InputResult RCalHeaderFramework::handleInput(int key, WINDOW* window) {
     if (!window) throw std::invalid_argument("input window must not be null");
     switch (key) {
+        case KEY_UP: moveNoteSelection(-1); return InputResult::redraw;
+        case KEY_DOWN: moveNoteSelection(1); return InputResult::redraw;
+        case 'w': toggleSelectedWorkStatus(WorkStatus::workday); return InputResult::redraw;
+        case 't': toggleSelectedWorkStatus(WorkStatus::travelling); return InputResult::redraw;
+        case 'o':
+            toggleSelectedWorkStatus(WorkStatus::outOfOfficeWorking);
+            return InputResult::redraw;
+        case 'a':
+            toggleSelectedWorkStatus(WorkStatus::compensatoryLeave);
+            return InputResult::redraw;
+        case 'f': toggleSelectedWorkStatus(WorkStatus::vacation); return InputResult::redraw;
+        case ' ': clearSelectedWorkStatus(); return InputResult::redraw;
         case 'q':
         case 'Q':
         case 27:
             return InputResult::quit;
         case KEY_LEFT:
-        case 'h':
             moveSelection(-1);
             return InputResult::redraw;
         case KEY_RIGHT:
-        case 'l':
             moveSelection(1);
             return InputResult::redraw;
         case KEY_PPAGE:
@@ -738,7 +879,7 @@ InputResult RCalHeaderFramework::handleInput(int key, WINDOW* window) {
             moveSelection(static_cast<int>(std::max<std::size_t>(1, visibleDayCount_)));
             return InputResult::redraw;
         case KEY_HOME:
-        case 't':
+        case 'n':
             selectDate(currentLocalDate());
             return InputResult::redraw;
         case KEY_RESIZE:
@@ -874,6 +1015,37 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
         const std::string explanation = options_.holidayInfoPrefix.empty()
             ? selectedHoliday : options_.holidayInfoPrefix + ": " + selectedHoliday;
         put(window, top + 7, firstCell, explanation, styles.attributes(colors_.holiday));
+    }
+    const DayInfo* selectedInfo = dayInfo(selectedDate_);
+    const std::size_t noteCount = selectedInfo ? selectedInfo->notes.size() : 0;
+    if (windowHeight > top + 10) {
+        put(window, top + 9, left,
+            "Notes (" + std::to_string(noteCount) +
+                ")  Up/Down: select  Enter: edit  Insert: create",
+            styles.attributes(colors_.label));
+        const int availableRows = std::max(0, windowHeight - (top + 10) - 2);
+        std::size_t firstNote = 0;
+        if (availableRows > 0 && selectedNoteIndex_ >= static_cast<std::size_t>(availableRows))
+            firstNote = selectedNoteIndex_ - static_cast<std::size_t>(availableRows) + 1;
+        for (int row = 0; row < availableRows && firstNote + row < noteCount; ++row) {
+            const std::size_t noteIndex = firstNote + static_cast<std::size_t>(row);
+            const ColorStyle noteStyle = noteIndex == selectedNoteIndex_
+                ? highlightedStyle(colors_.timeInfo, colors_.selectedDay)
+                : colors_.timeInfo;
+            put(window, top + 10 + row, left,
+                " " + std::to_string(noteIndex + 1) + ". " + selectedInfo->notes[noteIndex],
+                styles.attributes(noteStyle));
+        }
+    }
+    if (windowHeight > top + 8) {
+        const std::string date = std::to_string(selectedDate_.year) + "-" +
+            (selectedDate_.month < 10 ? "0" : "") + std::to_string(selectedDate_.month) + "-" +
+            (selectedDate_.day < 10 ? "0" : "") + std::to_string(selectedDate_.day);
+        const std::string status = " " + date + " | " + infoDescription(selectedDate_) + " ";
+        const attr_t statusAttributes = styles.attributes(colors_.statusBar);
+        wattrset(window, statusAttributes);
+        mvwhline(window, windowHeight - 1, left, ' ', windowWidth - left);
+        put(window, windowHeight - 1, left, status, statusAttributes);
     }
     wattrset(window, A_NORMAL);
     return std::min(8, windowHeight - top);

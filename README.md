@@ -34,9 +34,10 @@ Run the interactive example from the repository root:
 ./build/r-cal config/rcal.conf.example
 ```
 
-Press any key to exit. Copy `config/rcal.conf.example` and edit its labels,
-localized names, range, layout, and `color.*` settings to customize the header.
-`start_date` accepts either an ISO date (`YYYY-MM-DD`) or `today`.
+Use the navigation keys below and press `q`, `Q`, or Escape to exit. Copy
+`config/rcal.conf.example` and edit its labels, localized names, range, layout,
+and `color.*` settings to customize the header. `start_date` accepts either an
+ISO date (`YYYY-MM-DD`) or `today`.
 
 Colors use `foreground,background` syntax followed by optional `bold`,
 `underline`, or `reverse` attributes. The eight standard curses color names,
@@ -51,10 +52,23 @@ keeps a 90-day buffer on both sides and rebuilds it when fewer than 30 hidden
 days remain. These values are configured with `buffer_days` and
 `rebuild_threshold_days`.
 
-- Left/Right or `h`/`l`: select the previous or next day.
+- Left/Right: select the previous or next day.
 - Page Up/Page Down: move by one visible screen.
-- Home or `t`: return to today.
+- Home or `n`: return to today.
+- `c`: open the color selector.
+- Insert: open the create-item chooser for a Note, Task, or Event.
+- Up/Down: select a note below the calendar.
+- Enter: edit the selected note.
+- `w`, `t`, `o`, `a`, or `f`: toggle the selected date's work status.
+- Space: clear the selected date's work status.
 - `q`, `Q`, or Escape: quit.
+
+The color selector lists separate foreground and background rows for every
+configurable element. Use Up/Down to choose a row, Left/Right to choose among
+the colors supported by the current terminal, and `b`, `u`, or `r` to toggle
+bold, underline, or reverse on that element. Enter applies the edited palette
+and writes it to the loaded configuration file. Escape closes the selector
+without changing the active palette or the file.
 
 Today and the selected date retain their normal foreground color, including
 weekend and holiday colors. `color.current_day` and `color.selected_day` apply
@@ -75,16 +89,30 @@ The five-character Info cell has fixed positions:
 [work status][holiday][note][task count][events]
 ```
 
-- Work status: `W` workday, `T` travelling, `O` out-of-office working, or `A`
-  compensatory leave (avspasering).
+- Work status: `W` workday, `T` travelling, `O` out-of-office working, `A`
+  compensatory leave (avspasering), or `F` vacation (ferie).
 - Holiday: `H` when the calendar date is a Norwegian public holiday.
-- Note: `N` when the date has an associated note.
+- Note: `N` when the date has one or more non-empty user-entered notes.
 - Task count: `1`–`9`, or `+` for ten or more tasks.
 - Events: `E` when one or more events exist.
 
 For example, `WHN3E` means a working public holiday with a note, three tasks,
 and at least one event. `cell_width` must be at least 5. Full selected-day text,
 currently the holiday name, is shown on the Detail row below the indicators.
+The status bar at the bottom expands the selected date's active codes and
+counts into readable descriptions. Its appearance is configured with
+`color.status_bar` and can also be changed in the color selector.
+
+Each date can contain multiple independent diary or list-style notes. They are
+shown one per row below the calendar. Press Insert to open the create-item
+chooser, select Note, and press Enter. Use Up/Down in the normal view to select
+an existing note, then press Enter to edit it in the line above the status bar.
+The editor supports normal text entry, Left/Right, Home/End, Backspace, and
+Delete. Enter saves the note; Escape cancels the edit. Saving an existing note
+as empty removes it. Notes are UTF-8 text, including Norwegian characters.
+
+The create-item chooser also reserves Task and Event entries. Their editors
+are not implemented yet and are labelled accordingly in the menu.
 
 ## Norwegian holidays
 

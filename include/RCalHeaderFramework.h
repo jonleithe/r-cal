@@ -26,14 +26,15 @@ enum class WorkStatus{
     workday,
     travelling,
     outOfOfficeWorking,
-    compensatoryLeave
+    compensatoryLeave,
+    vacation
 };
 
 
 
 struct DayInfo{
     WorkStatus workStatus = WorkStatus::unspecified;
-    bool hasNote = false;
+    std::vector<std::string> notes;
     unsigned taskCount = 0;
     unsigned eventCount = 0;
 };
@@ -68,6 +69,7 @@ struct HeaderColors{
     ColorStyle selectedDay{"default", "blue", false, false, false};
     ColorStyle timeInfo;
     ColorStyle grid;
+    ColorStyle statusBar{"black", "white", false, false, false};
 };
 
 
@@ -137,12 +139,20 @@ public:
     std::size_t firstVisibleDay() const noexcept;
     std::size_t visibleDayCount() const noexcept;
     const DayInfo* dayInfo(Date date) const noexcept;
+    const std::string* selectedNote() const noexcept;
+    std::size_t selectedNoteIndex() const noexcept;
     std::string infoIndicator(Date date) const;
+    std::string infoDescription(Date date) const;
 
     void setOptions(HeaderOptions options);
     void setColors(HeaderColors colors);
     void setDayInfo(Date date, DayInfo info);
+    void addNote(Date date, std::string note);
+    void updateSelectedNote(std::string note);
+    void moveNoteSelection(int rows);
     bool removeDayInfo(Date date);
+    void toggleSelectedWorkStatus(WorkStatus status);
+    void clearSelectedWorkStatus();
     void rebuildTimeline();
     void moveSelection(int days);
     void selectDate(Date date);
@@ -165,6 +175,7 @@ private:
     std::size_t selectedDayIndex_ = 0;
     std::size_t firstVisibleDay_ = 0;
     std::size_t visibleDayCount_ = 0;
+    std::size_t selectedNoteIndex_ = 0;
     bool viewportInitialized_ = false;
 };
 

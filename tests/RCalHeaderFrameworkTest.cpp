@@ -1,6 +1,14 @@
 #include "RCalHeaderFramework.h"
+#include "ColorSelector.h"
+#include "CreateItemSelector.h"
+#include "NoteEditor.h"
 
 #include <cassert>
+#include <cstdio>
+#include <fstream>
+#include <iterator>
+
+#include <curses.h>
 
 int main() {
     const rcal::ColorStyle weekend{"red", "default", false, true, false};
@@ -56,27 +64,97 @@ int main() {
 
     rcal::DayInfo mayDayInfo;
     mayDayInfo.workStatus = rcal::WorkStatus::workday;
-    mayDayInfo.hasNote = true;
+    mayDayInfo.notes.push_back("Planlegg møte");
     mayDayInfo.taskCount = 3;
     mayDayInfo.eventCount = 1;
     holidays.setDayInfo({2024, 5, 1}, mayDayInfo);
     holidayOptions.holidayCountry = "NO";
     holidays.setOptions(holidayOptions);
     assert(holidays.infoIndicator({2024, 5, 1}) == "WHN3E");
+    assert(holidays.infoDescription({2024, 5, 1}) ==
+           "W Workday | H Arbeidernes dag | N Planlegg møte | 3 tasks | 1 event");
     assert(holidays.dayInfo({2024, 5, 1}) != nullptr);
     holidays.rebuildTimeline();
     assert(holidays.infoIndicator({2024, 5, 1}) == "WHN3E");
     mayDayInfo.taskCount = 12;
     holidays.setDayInfo({2024, 5, 2}, mayDayInfo);
     assert(holidays.infoIndicator({2024, 5, 2}) == "W N+E");
+    assert(holidays.infoDescription({2024, 5, 2}) ==
+           "W Workday | N Planlegg møte | 12 tasks | 1 event");
     assert(holidays.removeDayInfo({2024, 5, 2}));
     assert(holidays.dayInfo({2024, 5, 2}) == nullptr);
+
+    holidays.selectDate({2024, 5, 3});
+    holidays.toggleSelectedWorkStatus(rcal::WorkStatus::vacation);
+    assert(holidays.infoIndicator({2024, 5, 3})[0] == 'F');
+    assert(holidays.infoDescription({2024, 5, 3}) == "F Vacation");
+    holidays.toggleSelectedWorkStatus(rcal::WorkStatus::vacation);
+    assert(holidays.infoIndicator({2024, 5, 3})[0] == ' ');
+    holidays.toggleSelectedWorkStatus(rcal::WorkStatus::travelling);
+    holidays.clearSelectedWorkStatus();
+    assert(holidays.dayInfo({2024, 5, 3}) == nullptr);
+
+    auto* inputWindow = reinterpret_cast<WINDOW*>(1);
+    assert(holidays.handleInput('w', inputWindow) == rcal::InputResult::redraw);
+    assert(holidays.infoIndicator(holidays.selectedDate())[0] == 'W');
+    assert(holidays.handleInput('w', inputWindow) == rcal::InputResult::redraw);
+    assert(holidays.infoIndicator(holidays.selectedDate())[0] == ' ');
+    assert(holidays.handleInput('t', inputWindow) == rcal::InputResult::redraw);
+    assert(holidays.infoIndicator(holidays.selectedDate())[0] == 'T');
+    assert(holidays.handleInput(' ', inputWindow) == rcal::InputResult::redraw);
+    assert(holidays.infoIndicator(holidays.selectedDate())[0] == ' ');
+    assert(holidays.handleInput('o', inputWindow) == rcal::InputResult::redraw);
+    assert(holidays.infoIndicator(holidays.selectedDate())[0] == 'O');
+    assert(holidays.handleInput('a', inputWindow) == rcal::InputResult::redraw);
+    assert(holidays.infoIndicator(holidays.selectedDate())[0] == 'A');
+    assert(holidays.handleInput('f', inputWindow) == rcal::InputResult::redraw);
+    assert(holidays.infoIndicator(holidays.selectedDate())[0] == 'F');
+    holidays.clearSelectedWorkStatus();
+    assert(holidays.handleInput('W', inputWindow) == rcal::InputResult::ignored);
+
+    holidays.addNote({2024, 5, 3}, "Husk dette");
+    holidays.addNote({2024, 5, 3}, "Kjøp melk");
+    assert(holidays.infoIndicator({2024, 5, 3})[2] == 'N');
+    assert(holidays.infoDescription({2024, 5, 3}) == "N 2 notes");
+    assert(holidays.selectedNoteIndex() == 1);
+    assert(*holidays.selectedNote() == "Kjøp melk");
+    holidays.moveNoteSelection(-1);
+    assert(*holidays.selectedNote() == "Husk dette");
+    holidays.updateSelectedNote("Endret notat");
+    assert(*holidays.selectedNote() == "Endret notat");
+    holidays.updateSelectedNote("");
+    assert(*holidays.selectedNote() == "Kjøp melk");
+    holidays.updateSelectedNote("");
+    assert(holidays.dayInfo({2024, 5, 3}) == nullptr);
+
+    rcal::NoteEditor noteEditor("Hei");
+    noteEditor.handleInput(L' ', false);
+    noteEditor.handleInput(L'ø', false);
+    assert(noteEditor.note() == "Hei ø");
+    noteEditor.handleInput(KEY_LEFT, true);
+    noteEditor.handleInput(127, false);
+    assert(noteEditor.note() == "Heiø");
+    assert(noteEditor.handleInput(L'\n', false) == rcal::NoteEditorResult::save);
+    assert(rcal::NoteEditor("uendret").handleInput(27, false) ==
+           rcal::NoteEditorResult::cancel);
+
+    rcal::CreateItemSelector createSelector;
+    assert(createSelector.selectedItem() == 0);
+    createSelector.handleInput(KEY_DOWN);
+    assert(createSelector.selectedItem() == 1);
+    assert(createSelector.handleInput(KEY_ENTER) == rcal::CreateItemResult::editing);
+    createSelector.handleInput('n');
+    assert(createSelector.handleInput(KEY_ENTER) == rcal::CreateItemResult::createNote);
+    assert(rcal::CreateItemSelector{}.handleInput(27) == rcal::CreateItemResult::cancel);
 
     const auto configured = rcal::RCalHeaderFramework::fromConfigFile(
         std::string(RCAL_SOURCE_DIR) + "/config/rcal.conf.example");
     assert(configured.options().bufferDays == 90);
     assert(configured.options().rebuildThresholdDays == 30);
     assert(configured.colors().weekend.foreground == "red");
+    assert(configured.colors().currentDay.background == "yellow");
+    assert(configured.colors().selectedDay.background == "blue");
+    assert(configured.colors().statusBar.background == "white");
     assert(configured.options().holidayCountry == "NO");
     assert(configured.options().holidayInfoPrefix == "Helligdag");
     assert(configured.options().dayOfYearLabel == "DOY");
@@ -86,4 +164,30 @@ int main() {
     assert(configured.options().dayNames[5] == "Lør");
     assert(configured.options().dayNames[6] == "Søn");
     assert(configured.colors().holiday.bold);
+
+    rcal::ColorSelector selector(configured.colors(), 16);
+    assert(selector.palette().size() == 17);
+    assert(selector.palette()[1] == "black");
+    selector.handleInput(KEY_DOWN);
+    selector.handleInput(KEY_RIGHT);
+    selector.handleInput('u');
+    assert(selector.selectedRow() == 1);
+    assert(selector.colors().label.background == "black");
+    assert(selector.colors().label.underline);
+
+    const std::string savedConfig = std::string(RCAL_SOURCE_DIR) + "/build/color-selector-test.conf";
+    {
+        std::ofstream output(savedConfig);
+        output << "# retained comment\nstart_date=2024-01-01\ncolor.label=white,default\n";
+    }
+    rcal::saveColorsToConfig(savedConfig, selector.colors());
+    std::ifstream savedInput(savedConfig);
+    const std::string savedText((std::istreambuf_iterator<char>(savedInput)),
+                                std::istreambuf_iterator<char>());
+    assert(savedText.find("# retained comment") != std::string::npos);
+    assert(savedText.find("color.label=" + configured.colors().label.foreground +
+                          ",black,bold,underline") != std::string::npos);
+    assert(savedText.find("color.grid=") != std::string::npos);
+    assert(savedText.find("color.status_bar=") != std::string::npos);
+    std::remove(savedConfig.c_str());
 }

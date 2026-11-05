@@ -8,7 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(NCURSESW REQUIRED IMPORTED_TARGET ncursesw)
 
-add_library(rcal_header src/RCalHeaderFramework.cpp)
+add_library(rcal_header src/RCalHeaderFramework.cpp src/ColorSelector.cpp
+    src/CreateItemSelector.cpp src/NoteEditor.cpp)
 target_include_directories(rcal_header PUBLIC include)
 target_link_libraries(rcal_header PUBLIC PkgConfig::NCURSESW)
 target_compile_definitions(rcal_header PUBLIC _XOPEN_SOURCE_EXTENDED)
