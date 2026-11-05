@@ -1,3 +1,13 @@
+
+#Updated the scheme: day colors now persist under both current-day and selected-day highlights.
+#Weekend/holiday text remains red.
+#Current day uses the blue background.
+#Selected day uses the yellow background and bold emphasis.
+#If current and selected are the same day, yellow selection wins.
+#I also changed the example highlight settings to default,blue and default,yellow,bold, since highlight foregrounds are intentionally preserved from the normal day style. Updated [renderer (line 249)](/home/jole/projects/r-cal/src/RCalHeaderFramework.cpp:249), [config (line 35)](/home/jole/projects/r-cal/config/rcal.conf.example:35), and [README (line 59)](/home/jole/projects/r-cal/README.md:59).
+#Debug and Release tests pass.
+
+
 # Timeline range and layout
 start_date=today
 buffer_days=90
