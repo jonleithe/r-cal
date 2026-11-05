@@ -51,13 +51,18 @@ int main(int argc, char** argv)
         bool addingNote = false;
         while (running){
             erase();
-            header.render(stdscr);
+            header.render(stdscr, 0, 0, noteEditor && addingNote);
 
             // Copies changes made to stdscr to the physical terminal.
             refresh();
             if (colorSelector) colorSelector->render(stdscr);
             if (createItemSelector) createItemSelector->render(stdscr);
-            if (noteEditor) noteEditor->render(stdscr);
+            if (noteEditor) {
+                const auto* info = header.dayInfo(header.selectedDate());
+                const std::size_t index = addingNote
+                    ? (info ? info->notes.size() : 0) : header.selectedNoteIndex();
+                noteEditor->render(stdscr, header.noteRow(stdscr, index), index);
+            }
 
             wint_t key = 0;
             const int inputType = get_wch(&key);

@@ -20,7 +20,7 @@ public:
     explicit NoteEditor(const std::string& note);
 
     NoteEditorResult handleInput(wint_t key, bool keyCode);
-    void render(WINDOW* window) const;
+    void render(WINDOW* window, int row, std::size_t noteIndex) const;
 
     std::string note() const;
     std::size_t cursor() const noexcept;

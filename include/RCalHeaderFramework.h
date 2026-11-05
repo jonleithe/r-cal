@@ -160,7 +160,8 @@ public:
 
     // The caller must initialize curses with initscr() before rendering.
     // Returns the number of terminal rows written.
-    int render(WINDOW* window, int top = 0, int left = 0);
+    int render(WINDOW* window, int top = 0, int left = 0, bool addingNote = false);
+    int noteRow(WINDOW* window, std::size_t noteIndex, int top = 0) const;
 
 private:
     void ensureViewport(WINDOW* window, int left);

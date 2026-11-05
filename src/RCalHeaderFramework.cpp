@@ -893,7 +893,14 @@ InputResult RCalHeaderFramework::handleInput(int key, WINDOW* window) {
 
 
 
-int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
+int RCalHeaderFramework::noteRow(WINDOW* window, std::size_t noteIndex, int top) const {
+    const int availableRows = std::max(0, getmaxy(window) - (top + 10) - 2);
+    if (availableRows == 0) return -1;
+    return top + 10 + static_cast<int>(std::min(noteIndex,
+        static_cast<std::size_t>(availableRows - 1)));
+}
+
+int RCalHeaderFramework::render(WINDOW* window, int top, int left, bool addingNote) {
     if (!window) throw std::invalid_argument("render window must not be null");
     if (top < 0 || left < 0)
         throw std::invalid_argument("render position must not be negative");
@@ -1025,8 +1032,9 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
             styles.attributes(colors_.label));
         const int availableRows = std::max(0, windowHeight - (top + 10) - 2);
         std::size_t firstNote = 0;
-        if (availableRows > 0 && selectedNoteIndex_ >= static_cast<std::size_t>(availableRows))
-            firstNote = selectedNoteIndex_ - static_cast<std::size_t>(availableRows) + 1;
+        const std::size_t activeNote = addingNote ? noteCount : selectedNoteIndex_;
+        if (availableRows > 0 && activeNote >= static_cast<std::size_t>(availableRows))
+            firstNote = activeNote - static_cast<std::size_t>(availableRows) + 1;
         for (int row = 0; row < availableRows && firstNote + row < noteCount; ++row) {
             const std::size_t noteIndex = firstNote + static_cast<std::size_t>(row);
             const ColorStyle noteStyle = noteIndex == selectedNoteIndex_

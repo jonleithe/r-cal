@@ -61,14 +61,13 @@ NoteEditorResult NoteEditor::handleInput(wint_t key, bool keyCode) {
     return NoteEditorResult::editing;
 }
 
-void NoteEditor::render(WINDOW* window) const {
+void NoteEditor::render(WINDOW* window, int row, std::size_t noteIndex) const {
     int height = 0;
     int width = 0;
     getmaxyx(window, height, width);
-    if (height < 2 || width < 1) return;
+    if (row < 0 || row >= height - 1 || width < 1) return;
 
-    const int row = height - 2;
-    const std::wstring prompt = L" Note: ";
+    const std::wstring prompt = L" " + std::to_wstring(noteIndex + 1) + L". ";
     const int promptWidth = std::min(width, static_cast<int>(prompt.size()));
     const int inputWidth = std::max(0, width - promptWidth - 1);
     std::size_t first = 0;

@@ -106,7 +106,8 @@ counts into readable descriptions. Its appearance is configured with
 Each date can contain multiple independent diary or list-style notes. They are
 shown one per row below the calendar. Press Insert to open the create-item
 chooser, select Note, and press Enter. Use Up/Down in the normal view to select
-an existing note, then press Enter to edit it in the line above the status bar.
+an existing note, then press Enter to edit it directly on its note row. New notes are edited on
+the next row in the list, which scrolls when necessary to keep the editor visible.
 The editor supports normal text entry, Left/Right, Home/End, Backspace, and
 Delete. Enter saves the note; Escape cancels the edit. Saving an existing note
 as empty removes it. Notes are UTF-8 text, including Norwegian characters.
