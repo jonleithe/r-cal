@@ -223,6 +223,9 @@ ColorStyle parseStyle(const std::string& value) {
 ColorStyle selectedStyle(const ColorStyle& base, const ColorStyle& highlight) {
     ColorStyle result = base;
     result.background = highlight.background;
+    result.bold = result.bold || highlight.bold;
+    result.underline = result.underline || highlight.underline;
+    result.reverse = result.reverse || highlight.reverse;
     return result;
 }
 
@@ -771,24 +774,28 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left) {
         const bool isToday = sameDate(day.date, today);
         const bool isSelected = i == selectedDayIndex_;
         const bool isHoliday = !day.holidayName.empty();
-        const ColorStyle& baseDayOfYearStyle = isToday ? colors_.currentDay
-            : (isHoliday ? colors_.holiday : colors_.dayOfYear);
-        const ColorStyle& baseDateStyle = isToday ? colors_.currentDay
-            : (isHoliday ? colors_.holiday : colors_.date);
-        const ColorStyle& baseDayStyle = isToday ? colors_.currentDay
-            : (isHoliday ? colors_.holiday
-            : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName));
-        const ColorStyle& baseInfoStyle = isToday ? colors_.currentDay
-            : (isHoliday ? colors_.holiday : colors_.timeInfo);
+        const ColorStyle& normalDayOfYearStyle = isHoliday ? colors_.holiday : colors_.dayOfYear;
+        const ColorStyle& normalDateStyle = isHoliday ? colors_.holiday : colors_.date;
+        const ColorStyle& normalDayStyle = isHoliday ? colors_.holiday
+            : (day.isoWeekday >= 6 ? colors_.weekend : colors_.dayName);
+        const ColorStyle& normalInfoStyle = isHoliday ? colors_.holiday : colors_.timeInfo;
+        const ColorStyle currentDayOfYearStyle = isToday
+            ? highlightedStyle(normalDayOfYearStyle, colors_.currentDay) : normalDayOfYearStyle;
+        const ColorStyle currentDateStyle = isToday
+            ? highlightedStyle(normalDateStyle, colors_.currentDay) : normalDateStyle;
+        const ColorStyle currentDayStyle = isToday
+            ? highlightedStyle(normalDayStyle, colors_.currentDay) : normalDayStyle;
+        const ColorStyle currentInfoStyle = isToday
+            ? highlightedStyle(normalInfoStyle, colors_.currentDay) : normalInfoStyle;
         const ColorStyle dayOfYearStyle = isSelected
-            ? highlightedStyle(baseDayOfYearStyle, colors_.selectedDay)
-            : baseDayOfYearStyle;
+            ? highlightedStyle(currentDayOfYearStyle, colors_.selectedDay)
+            : currentDayOfYearStyle;
         const ColorStyle dateStyle = isSelected
-            ? highlightedStyle(baseDateStyle, colors_.selectedDay) : baseDateStyle;
+            ? highlightedStyle(currentDateStyle, colors_.selectedDay) : currentDateStyle;
         const ColorStyle dayStyle = isSelected
-            ? highlightedStyle(baseDayStyle, colors_.selectedDay) : baseDayStyle;
+            ? highlightedStyle(currentDayStyle, colors_.selectedDay) : currentDayStyle;
         const ColorStyle infoStyle = isSelected
-            ? highlightedStyle(baseInfoStyle, colors_.selectedDay) : baseInfoStyle;
+            ? highlightedStyle(currentInfoStyle, colors_.selectedDay) : currentInfoStyle;
         put(window, top + 3, x, centered(std::to_string(day.dayOfYear), width), styles.attributes(dayOfYearStyle));
         put(window, top + 4, x, centered(std::to_string(day.date.day), width), styles.attributes(dateStyle));
         put(window, top + 5, x, centered(options_.dayNames.at(day.isoWeekday - 1), width), styles.attributes(dayStyle));

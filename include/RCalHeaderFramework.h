@@ -49,7 +49,7 @@ struct ColorStyle{
     bool reverse    = false;
 };
 
-// Applies a highlight background while retaining the content's foreground and attributes.
+// Applies a highlight background and attributes while retaining the content foreground.
 ColorStyle highlightedStyle(const ColorStyle& base, const ColorStyle& highlight);
 
 

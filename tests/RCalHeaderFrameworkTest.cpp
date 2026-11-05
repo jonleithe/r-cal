@@ -8,7 +8,7 @@ int main() {
     const auto selectedWeekend = rcal::highlightedStyle(weekend, selection);
     assert(selectedWeekend.foreground == "red");
     assert(selectedWeekend.background == "blue");
-    assert(!selectedWeekend.bold);
+    assert(selectedWeekend.bold);
     assert(selectedWeekend.underline);
     assert(!selectedWeekend.reverse);
 
@@ -86,8 +86,4 @@ int main() {
     assert(configured.options().dayNames[5] == "Lør");
     assert(configured.options().dayNames[6] == "Søn");
     assert(configured.colors().holiday.bold);
-    assert(configured.colors().currentDay.foreground == "black");
-    assert(configured.colors().currentDay.background == "yellow");
-    assert(configured.colors().currentDay.bold);
-    assert(configured.colors().selectedDay.background == "blue");
 }

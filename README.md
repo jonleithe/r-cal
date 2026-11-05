@@ -56,13 +56,12 @@ days remain. These values are configured with `buffer_days` and
 - Home or `t`: return to today.
 - `q`, `Q`, or Escape: quit.
 
-Today is highlighted with `color.current_day`, while the selected date uses
-the background from `color.selected_day`. Its foreground and attributes are
-retained from the day's normal styling, so weekends and holidays keep their
-visual color while selected. Selection styling takes precedence when today is selected;
-the current-day styling returns as soon as selection moves away. Resizing the
-terminal recalculates the number of visible days and keeps the selected date
-centered.
+Today and the selected date retain their normal foreground color, including
+weekend and holiday colors. `color.current_day` and `color.selected_day` apply
+their background and attributes as highlight overlays. Selection styling takes
+precedence when today is selected; the current-day styling returns as soon as
+selection moves away. Resizing the terminal recalculates the number of visible
+days and keeps the selected date centered.
 
 ## Per-day information
 

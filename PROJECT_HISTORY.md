@@ -3,6 +3,14 @@
 This is a concise, chronological record of major milestones and decisions for
 `r-cal`. It is not a substitute for Git history or a release changelog.
 
+## 2026-11-05
+
+### Persistent day-color highlights
+
+- Current-day and selected-day highlights retain the ordinary foreground color
+  while applying their configured background and attributes, so weekend and
+  holiday colors remain recognizable.
+
 ## 2026-11-04
 
 ### Selection preserves day colors
