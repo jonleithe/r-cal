@@ -42,6 +42,17 @@ color.current_day=black,yellow,bold
 
 color.selected_day=black,blue
 
-color.time_info=56,default
+color.time_info=15,default
 color.grid=green,default
 color.status_bar=black,white
+
+# Item list colors, independent of the calendar Info indicators.
+color.notes=white,default
+color.tasks=yellow,default
+color.events=cyan,default
+
+# Full foreground/background style shared by the selected note, task, or event.
+color.selected_item=black,cyan,bold
+
+# Incomplete overdue tasks; the selected row uses color.selected_item.
+color.overdue_task=red,default,bold

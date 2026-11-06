@@ -56,10 +56,14 @@ days remain. These values are configured with `buffer_days` and
 - Left/Right: select the previous or next day.
 - Page Up/Page Down: move by one visible screen.
 - Home or `n`: return to today.
+- `?`: open help. Use Up/Down or Page Up/Page Down to scroll; Escape or `?`
+  closes help and returns to the calendar.
 - `c`: open the color selector.
 - Insert: open the create-item chooser for a Note, Task, or Event.
 - Up/Down: select a note, task, or event below the calendar.
 - Enter: edit the selected item.
+- Delete: remove the selected note, task, or event immediately. A multi-day
+  event is removed from every covered date.
 - `x`: toggle completion of the selected task.
 - `w`, `t`, `o`, `a`, or `f`: toggle the selected date's work status.
 - Space: clear the selected date's work status.
@@ -105,15 +109,63 @@ The status bar at the bottom expands the selected date's active codes and
 counts into readable descriptions. Its appearance is configured with
 `color.status_bar` and can also be changed in the color selector.
 
+The item list has separate `color.notes`, `color.tasks`, and `color.events`
+styles, available as Notes, Tasks, and Events in the color selector. Defaults
+are white, yellow, and cyan respectively, on the terminal background. The
+**Selected item** picker entry (`color.selected_item`) controls the full
+foreground, background, and attributes of the highlighted note, task, or event.
+It defaults to bold black on cyan. `color.time_info`
+continues to control the compact calendar Info row.
+
 Each date can contain multiple independent diary/list-style notes, tasks, and
 events. Press Insert to open the create-item chooser, then use Up/Down in the
 normal view to select an existing item and Enter to edit it. Saving an existing
-item as empty removes it. Press `x` to complete or reopen the selected task.
+item as empty removes it. Delete removes the selected item and selects the
+next item, or the previous one when deleting the last item. Within an editor,
+Delete removes the character at the cursor. Press `x` to complete or reopen the selected task.
 
-Events accept an optional 24-hour time prefix: enter `09:30 Team stand-up` to
-store a timed event, or omit the prefix for an all-day event. Events with times
-are listed before all-day events. Item text is UTF-8, including Norwegian
-characters.
+Tasks open a form with separate **Description**, **Due date**, and **Due time**
+fields. Use Tab, Shift+Tab, or Up/Down to change fields, Enter to save, and
+Escape to cancel. Dates use `YYYY-MM-DD` and optional times use local 24-hour
+`HH:MM`. New tasks default to the selected date; clear both deadline fields
+for a task without a deadline. A time requires a date. For example, enter
+`Send report` as the description, `2026-11-10` as the due date, and `16:00` as
+the due time. Times typed in Description remain ordinary text.
+
+Incomplete tasks show a leading `!` and `OVERDUE` after their deadline in local
+time. The **Overdue task** color-picker entry (`color.overdue_task`) defaults
+to bold red. Selected overdue tasks keep the **Selected item** colors and the
+`!` marker. Completed tasks use normal task styling. A date-only
+deadline remains valid through that entire day. Completed tasks are never
+marked overdue. Tasks without a prefix have no deadline.
+
+Events open a form with separate **Description**, **Start date**, **Start time**,
+**End date**, and **End time** fields. Use Tab, Shift+Tab, or Up/Down to move
+between fields, Enter to save, and Escape to cancel. Dates use `YYYY-MM-DD`;
+times use local 24-hour `HH:MM` and may be left blank. New events default to the
+selected date for both endpoints. A blank end date defaults to the start date.
+
+Events appear in the list and show an `E` indicator on every date from the
+start date through the end date, including both endpoints, even when the end
+time is midnight. With no times, the range is all-day; a missing start time is
+interpreted as the beginning of its day and a missing end time as the end of
+its day for validation. An end before the start is rejected without closing
+the editor.
+
+For example, an event starting on `2026-11-06` at `09:00` and ending on
+`2026-11-08` at `17:00` appears on 6, 7, and 8 November. Each occurrence refers
+to the same event: editing or deleting it from any of those dates updates the
+whole range. Changing its dates removes it from the old dates and shows it
+on the new ones. Creating an event outside the currently selected date moves
+the selection to its start date.
+
+A task's due date is independent of the date where it is filed. Reopening a
+task with Enter loads its existing deadline into the form; clear both deadline
+fields to remove it. Editing preserves task identity and completion state.
+Clearing a note's text or a task/event's Description deletes it. Invalid schedules keep the editor open with an error.
+Overdue labels refresh while idle. Events load in start-date/time order, with
+timed events before all-day events on the same start date. Item text supports
+UTF-8, including Norwegian characters.
 
 ## Persistence
 

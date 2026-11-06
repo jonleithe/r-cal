@@ -37,6 +37,7 @@ private:
     HeaderColors colors_;
     std::vector<std::string> palette_;
     std::size_t selectedRow_ = 0;
+    std::size_t firstVisibleRow_ = 0;
     std::vector<std::size_t> palettePositions_;
 };
 

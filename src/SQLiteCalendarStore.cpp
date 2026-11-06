@@ -1,4 +1,5 @@
 #include "SQLiteCalendarStore.h"
+#include "Scheduling.h"
 
 #include <sqlite3.h>
 
@@ -148,16 +149,6 @@ std::string newRecordId(sqlite3 *database) {
 
 
 
-void validateEventTime(const std::string &time) {
-    if (time.empty())
-        return;
-    if (time.size() != 5 || time[2] != ':' || time[0] < '0' || time[0] > '2' ||
-        time[1] < '0' || time[1] > '9' || time[3] < '0' || time[3] > '5' ||
-        time[4] < '0' || time[4] > '9' || (time[0] == '2' && time[1] > '3'))
-        throw std::invalid_argument("event time must be HH:MM");
-}
-// ——— End of validateEventTime() ——————————————————————————————————————————————
-
 } // namespace
 
 SQLiteCalendarStore::SQLiteCalendarStore(
@@ -247,9 +238,23 @@ SQLiteCalendarStore::SQLiteCalendarStore(
             execute(database_, "CREATE INDEX events_by_date_time_position ON "
                                "events(date, time, position)");
             execute(database_, "PRAGMA user_version = 2");
-        } else if (version != 2) {
+        } else if (version != 2 && version != 3 && version != 4) {
             throw std::runtime_error("unsupported SQLite schema version " +
                                      std::to_string(version));
+        }
+        if (version < 3) {
+            execute(database_, "ALTER TABLE tasks ADD COLUMN due_date TEXT NOT NULL DEFAULT ''");
+            execute(database_, "ALTER TABLE tasks ADD COLUMN due_time TEXT NOT NULL DEFAULT ''");
+            execute(database_, "ALTER TABLE events ADD COLUMN start_date TEXT NOT NULL DEFAULT ''");
+            execute(database_, "UPDATE events SET start_date = date");
+            execute(database_, "PRAGMA user_version = 3");
+        }
+        if (version < 4) {
+            execute(database_, "ALTER TABLE events ADD COLUMN end_date TEXT NOT NULL DEFAULT ''");
+            execute(database_, "ALTER TABLE events ADD COLUMN end_time TEXT NOT NULL DEFAULT ''");
+            execute(database_, "UPDATE events SET end_date = start_date");
+            execute(database_, "CREATE INDEX events_by_range ON events(start_date, end_date)");
+            execute(database_, "PRAGMA user_version = 4");
         }
         execute(database_, "COMMIT");
     } catch (...) {
@@ -305,7 +310,7 @@ DayInfo SQLiteCalendarStore::loadDay(const Date &date) {
                                      std::string(sqlite3_errmsg(database_)));
     }
     {
-        Statement statement(database_, "SELECT id, text, completed FROM tasks "
+        Statement statement(database_, "SELECT id, text, completed, due_date, due_time FROM tasks "
                                        "WHERE date = ? ORDER BY position, id");
         bindText(statement.get(), 1, day);
         int outcome = SQLITE_OK;
@@ -315,7 +320,9 @@ DayInfo SQLiteCalendarStore::loadDay(const Date &date) {
             result.tasks.push_back(
                 {id ? reinterpret_cast<const char *>(id) : "",
                  text ? reinterpret_cast<const char *>(text) : "",
-                 sqlite3_column_int(statement.get(), 2) != 0});
+                 sqlite3_column_int(statement.get(), 2) != 0,
+                 reinterpret_cast<const char *>(sqlite3_column_text(statement.get(), 3)),
+                 reinterpret_cast<const char *>(sqlite3_column_text(statement.get(), 4))});
         }
         if (outcome != SQLITE_DONE)
             throw std::runtime_error("SQLite step failed: " +
@@ -323,10 +330,11 @@ DayInfo SQLiteCalendarStore::loadDay(const Date &date) {
     }
     {
         Statement statement(database_,
-                            "SELECT id, time, text FROM events WHERE date = ? "
-                            "ORDER BY CASE WHEN time = '' THEN 1 ELSE 0 END, "
+                            "SELECT id, time, text, start_date, end_date, end_time FROM events WHERE start_date <= ? AND end_date >= ? "
+                            "ORDER BY start_date, CASE WHEN time = '' THEN 1 ELSE 0 END, "
                             "time, position, id");
         bindText(statement.get(), 1, day);
+        bindText(statement.get(), 2, day);
         int outcome = SQLITE_OK;
         while ((outcome = sqlite3_step(statement.get())) == SQLITE_ROW) {
             const auto *id = sqlite3_column_text(statement.get(), 0);
@@ -335,7 +343,10 @@ DayInfo SQLiteCalendarStore::loadDay(const Date &date) {
             result.events.push_back(
                 {id ? reinterpret_cast<const char *>(id) : "",
                  time ? reinterpret_cast<const char *>(time) : "",
-                 text ? reinterpret_cast<const char *>(text) : ""});
+                 text ? reinterpret_cast<const char *>(text) : "",
+                 reinterpret_cast<const char *>(sqlite3_column_text(statement.get(), 3)),
+                 reinterpret_cast<const char *>(sqlite3_column_text(statement.get(), 4)),
+                 reinterpret_cast<const char *>(sqlite3_column_text(statement.get(), 5))});
         }
         if (outcome != SQLITE_DONE)
             throw std::runtime_error("SQLite step failed: " +
@@ -430,36 +441,47 @@ void SQLiteCalendarStore::deleteNote(const NoteId &id) {
 
 
 Task SQLiteCalendarStore::addTask(const Date &date, std::string text,
-                                  std::size_t position) {
+                                  std::size_t position, std::string dueDate, std::string dueTime) {
     if (text.empty())
         throw std::invalid_argument("task text must not be empty");
+    validateSchedule(dueDate, dueTime);
+    if (dueDate.empty() && !dueTime.empty())
+        throw std::invalid_argument("task due time requires a due date");
     const std::string id = newRecordId(database_);
     Statement statement(
         database_,
-        "INSERT INTO tasks(id, date, position, text, completed, created_at, "
+        "INSERT INTO tasks(id, date, position, text, due_date, due_time, completed, created_at, "
         "updated_at) "
-        "VALUES (?, ?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), "
+        "VALUES (?, ?, ?, ?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), "
         "strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))");
     bindText(statement.get(), 1, id);
     bindText(statement.get(), 2, dateString(date));
     bindPosition(statement.get(), 3, position);
     bindText(statement.get(), 4, text);
+    bindText(statement.get(), 5, dueDate);
+    bindText(statement.get(), 6, dueTime);
     expectDone(database_, statement.get());
-    return {id, std::move(text), false};
+    return {id, std::move(text), false, std::move(dueDate), std::move(dueTime)};
 }
 // ——— End of addTask() ————————————————————————————————————————————————————————
 
 
 
-void SQLiteCalendarStore::updateTask(const TaskId &id, std::string text) {
+void SQLiteCalendarStore::updateTask(const TaskId &id, std::string text,
+                                      std::string dueDate, std::string dueTime) {
     if (text.empty())
         throw std::invalid_argument("task text must not be empty");
+    validateSchedule(dueDate, dueTime);
+    if (dueDate.empty() && !dueTime.empty())
+        throw std::invalid_argument("task due time requires a due date");
     Statement statement(
         database_,
-        "UPDATE tasks SET text = ?, "
+        "UPDATE tasks SET text = ?, due_date = ?, due_time = ?, "
         "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?");
     bindText(statement.get(), 1, text);
-    bindText(statement.get(), 2, id);
+    bindText(statement.get(), 2, dueDate);
+    bindText(statement.get(), 3, dueTime);
+    bindText(statement.get(), 4, id);
     expectDone(database_, statement.get());
     if (sqlite3_changes(database_) != 1)
         throw std::runtime_error("task does not exist");
@@ -496,47 +518,52 @@ void SQLiteCalendarStore::setTaskCompleted(const TaskId &id, bool completed) {
 
 
 Event SQLiteCalendarStore::addEvent(const Date &date, std::string time,
-                                    std::string text, std::size_t position) {
-    if (text.empty())
-        throw std::invalid_argument("event text must not be empty");
-    validateEventTime(time);
-    const std::string id = newRecordId(database_);
-    Statement statement(
-        database_,
-        "INSERT INTO events(id, date, position, time, text, created_at, "
-        "updated_at) "
-        "VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), "
+                                    std::string text, std::size_t position, std::string startDate,
+                                    std::string endDate, std::string endTime) {
+    if (text.empty()) throw std::invalid_argument("event text must not be empty");
+    Event event{newRecordId(database_), time, text, startDate, endDate, endTime};
+    normalizeEvent(event, dateString(date));
+    Statement statement(database_,
+        "INSERT INTO events(id, date, position, time, text, start_date, end_date, end_time, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), "
         "strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))");
-    bindText(statement.get(), 1, id);
+    bindText(statement.get(), 1, event.id);
     bindText(statement.get(), 2, dateString(date));
     bindPosition(statement.get(), 3, position);
-    bindText(statement.get(), 4, time);
-    bindText(statement.get(), 5, text);
+    bindText(statement.get(), 4, event.time);
+    bindText(statement.get(), 5, event.text);
+    bindText(statement.get(), 6, event.startDate);
+    bindText(statement.get(), 7, event.endDate);
+    bindText(statement.get(), 8, event.endTime);
     expectDone(database_, statement.get());
-    return {id, std::move(time), std::move(text)};
+    return event;
 }
-// ——— End of addEvent() ———————————————————————————————————————————————————————
-
-
 
 void SQLiteCalendarStore::updateEvent(const EventId &id, std::string time,
-                                      std::string text) {
-    if (text.empty())
-        throw std::invalid_argument("event text must not be empty");
-    validateEventTime(time);
-    Statement statement(
-        database_,
-        "UPDATE events SET time = ?, text = ?, "
+                                      std::string text, std::string startDate,
+                                      std::string endDate, std::string endTime) {
+    if (text.empty()) throw std::invalid_argument("event text must not be empty");
+    std::string defaultDate;
+    {
+        Statement lookup(database_, "SELECT start_date FROM events WHERE id = ?");
+        bindText(lookup.get(), 1, id);
+        if (sqlite3_step(lookup.get()) != SQLITE_ROW) throw std::runtime_error("event does not exist");
+        defaultDate = reinterpret_cast<const char*>(sqlite3_column_text(lookup.get(), 0));
+    }
+    Event event{id, time, text, startDate, endDate, endTime};
+    normalizeEvent(event, defaultDate);
+    Statement statement(database_,
+        "UPDATE events SET time = ?, text = ?, start_date = ?, end_date = ?, end_time = ?, "
         "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?");
-    bindText(statement.get(), 1, time);
-    bindText(statement.get(), 2, text);
-    bindText(statement.get(), 3, id);
+    bindText(statement.get(), 1, event.time);
+    bindText(statement.get(), 2, event.text);
+    bindText(statement.get(), 3, event.startDate);
+    bindText(statement.get(), 4, event.endDate);
+    bindText(statement.get(), 5, event.endTime);
+    bindText(statement.get(), 6, id);
     expectDone(database_, statement.get());
-    if (sqlite3_changes(database_) != 1)
-        throw std::runtime_error("event does not exist");
+    if (sqlite3_changes(database_) != 1) throw std::runtime_error("event does not exist");
 }
-// ——— End of updateEvent() ————————————————————————————————————————————————————
-
 
 
 void SQLiteCalendarStore::deleteEvent(const EventId &id) {

@@ -12,7 +12,10 @@ CTest. C remains an enabled project language for future components.
 
 Calendar facts belong in `TimelineDay`; user-entered work, note, task, and event
 metadata belongs in date-keyed `DayInfo` records so viewport rebuilds cannot
-invalidate or discard it.
+invalidate or discard it. Events have one stable record and inclusive start/end
+calendar dates; each covered date's `DayInfo` contains a view of that event.
+Editing or deleting an event must refresh all cached daily occurrences. Event
+visibility follows its range rather than its original filing date.
 
 ## Source of truth
 

@@ -34,6 +34,7 @@ NoteEditor::NoteEditor(const std::string& note)
 NoteEditorResult NoteEditor::handleInput(wint_t key, bool keyCode) {
     if (keyCode) {
         switch (static_cast<int>(key)) {
+            case KEY_ENTER: return NoteEditorResult::save;
             case KEY_LEFT: if (cursor_ > 0) --cursor_; break;
             case KEY_RIGHT: if (cursor_ < text_.size()) ++cursor_; break;
             case KEY_HOME: cursor_ = 0; break;
@@ -86,6 +87,18 @@ void NoteEditor::render(WINDOW* window, int row, std::size_t noteIndex) const {
         promptWidth + static_cast<int>(cursor_ - first));
     wmove(window, row, cursorColumn);
     wrefresh(window);
+}
+
+void NoteEditor::renderField(WINDOW* window, int row, int column, int width, bool active) const {
+    if (width < 2) return;
+    const auto available = static_cast<std::size_t>(width - 1);
+    const std::size_t first = cursor_ >= available ? cursor_ - available + 1 : 0;
+    const auto visible = text_.substr(first, available);
+    wattrset(window, active ? A_REVERSE : A_UNDERLINE);
+    mvwhline(window, row, column, ' ', width);
+    mvwaddnwstr(window, row, column, visible.c_str(), static_cast<int>(available));
+    wattrset(window, A_NORMAL);
+    if (active) wmove(window, row, column + static_cast<int>(cursor_ - first));
 }
 
 std::string NoteEditor::note() const { return toUtf8(text_); }

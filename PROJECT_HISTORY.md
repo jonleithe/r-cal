@@ -5,6 +5,53 @@ This is a concise, chronological record of major milestones and decisions for
 
 ## 2026-11-06
 
+### In-app help added
+
+- Added a scrollable `?` help window with navigation, item editing, work status,
+  color-picker shortcuts, and Info-indicator explanations.
+- Help adapts to terminal dimensions and closes without changing calendar data.
+
+
+### Dedicated task editor added
+
+- Tasks now use separate description, due-date, and due-time fields for creation
+  and editing, so users can enter deadlines without text-prefix syntax.
+- New tasks default to the selected date. Blank deadline fields allow an
+  unscheduled task; invalid dates/times keep the form open with an error.
+- Structured task edits preserve identity and completion, and feed the existing
+  persistent deadline and overdue-rendering logic directly.
+
+
+### Event ranges and dedicated editor added
+
+- Replaced event text-prefix entry in the TUI with a form for description,
+  start date/time, and end date/time.
+- Events now appear on every date in their inclusive range. Each occurrence
+  shares one stable record; edits and deletion refresh all daily views.
+- SQLite schema version 4 adds end fields and a range index; existing events
+  become one-day ranges on their start dates.
+- Added range validation and coverage for migration, cross-buffer navigation,
+  boundary dates, and editing/deleting from the middle of a range.
+
+
+### Task deadlines and event starts added
+
+- Added optional task due dates/times and event start dates independent of the
+  filing date, with shared validation and editable schedule prefixes.
+- Calculate overdue status for incomplete tasks using local wall-clock time;
+  date-only deadlines expire after the date ends.
+- SQLite schema version 3 preserves existing tasks without deadlines and
+  initializes existing event start dates from their filing dates.
+- Keep invalid edits open with an error; refresh overdue labels while idle.
+
+
+### Separate item colors added
+
+- Notes, tasks, and events now have independent configurable list styles and
+  foreground/background entries in the color selector.
+- Default item colors use white, yellow, and cyan for readability on dark terminals.
+
+
 ### Local tasks and events added
 
 - Added SQLite schema version 2 with ordered task records, completion state,

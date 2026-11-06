@@ -11,7 +11,7 @@ namespace rcal {
 namespace {
 
 const std::array<const char*, 3> itemLabels{{
-    "Note", "Task", "Event (optional HH:MM prefix)"
+    "Note", "Task (due date/time fields)", "Event (start and end fields)"
 }};
 
 } // namespace
@@ -58,8 +58,10 @@ void CreateItemSelector::render(WINDOW* parent) const {
         mvwaddnstr(dialog, static_cast<int>(item) + 3, 3, itemLabels[item], width - 6);
         if (item == selectedItem_) wattroff(dialog, A_REVERSE);
     }
-    if (selectedItem_ == 2)
-        mvwaddnstr(dialog, height - 2, 2, "Example: 09:30 Team stand-up", width - 4);
+    if (selectedItem_ == 1)
+        mvwaddnstr(dialog, height - 2, 2, "Edit description, due date, and due time", width - 4);
+    else if (selectedItem_ == 2)
+        mvwaddnstr(dialog, height - 2, 2, "Edit start/end dates and times in the form", width - 4);
 
     copywin(dialog, parent, 0, 0, top, left, top + height - 1, left + width - 1, 0);
     delwin(dialog);

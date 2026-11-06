@@ -3,6 +3,10 @@
 #include "ColorSelector.h"
 #include "CreateItemSelector.h"
 #include "NoteEditor.h"
+#include "EventEditor.h"
+#include "TaskEditor.h"
+#include "HelpWindow.h"
+#include "Scheduling.h"
 
 #include <curses.h>
 #include <clocale>
@@ -11,6 +15,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 
 namespace {
 
@@ -54,33 +59,48 @@ int main(int argc, char** argv)
             use_default_colors();
         }
 
+        timeout(1000); // Refresh overdue labels even while no key is pressed.
         bool running = true;
+        std::string editorError;
         std::unique_ptr<rcal::ColorSelector> colorSelector;
         std::unique_ptr<rcal::CreateItemSelector> createItemSelector;
         std::unique_ptr<rcal::NoteEditor> noteEditor;
+        std::unique_ptr<rcal::EventEditor> eventEditor;
+        std::unique_ptr<rcal::TaskEditor> taskEditor;
+        std::unique_ptr<rcal::HelpWindow> helpWindow;
         bool addingItem = false;
         rcal::DayItemType editingItemType = rcal::DayItemType::note;
         while (running){
             erase();
             header.render(stdscr, 0, 0, noteEditor && addingItem);
 
-            // Copies changes made to stdscr to the physical terminal.
-            refresh();
+            // Compose the calendar and active dialog before updating the terminal.
             if (colorSelector) colorSelector->render(stdscr);
             if (createItemSelector) createItemSelector->render(stdscr);
+            if (eventEditor) eventEditor->render(stdscr);
+            if (taskEditor) taskEditor->render(stdscr);
             if (noteEditor) {
                 const auto* info = header.dayInfo(header.selectedDate());
                 const std::size_t index = addingItem
                     ? (info ? info->notes.size() + info->tasks.size() + info->events.size() : 0)
                     : header.selectedItemFlatIndex();
+                const std::string hint = !editorError.empty() ? editorError :
+                    "Note: Enter: save  Esc: cancel";
+                mvhline(LINES - 1, 0, ' ', COLS);
+                mvaddnstr(LINES - 1, 0, hint.c_str(), COLS - 1);
                 noteEditor->render(stdscr, header.noteRow(stdscr, index), index);
             }
+
+            if (helpWindow) helpWindow->render(stdscr);
+            refresh();
 
             wint_t key = 0;
             const int inputType = get_wch(&key);
             if (inputType == ERR) continue;
             const bool keyCode = inputType == KEY_CODE_YES;
-            if (colorSelector) {
+            if (helpWindow) {
+                if (helpWindow->handleInput(static_cast<int>(key))) helpWindow.reset();
+            } else if (colorSelector) {
                 const auto result = colorSelector->handleInput(static_cast<int>(key));
                 if (result == rcal::ColorSelectorResult::save) {
                     rcal::saveColorsToConfig(config, colorSelector->colors());
@@ -99,27 +119,66 @@ int main(int argc, char** argv)
                     editingItemType = result == rcal::CreateItemResult::createTask
                         ? rcal::DayItemType::task : result == rcal::CreateItemResult::createEvent
                         ? rcal::DayItemType::event : rcal::DayItemType::note;
-                    noteEditor = std::make_unique<rcal::NoteEditor>("");
+                    if (editingItemType == rcal::DayItemType::event) {
+                        rcal::Event event;
+                        event.startDate = event.endDate = rcal::calendarDateString(header.selectedDate());
+                        eventEditor = std::make_unique<rcal::EventEditor>(event);
+                    } else if (editingItemType == rcal::DayItemType::task) {
+                        rcal::Task task;
+                        task.dueDate = rcal::calendarDateString(header.selectedDate());
+                        taskEditor = std::make_unique<rcal::TaskEditor>(task);
+                    } else {
+                        noteEditor = std::make_unique<rcal::NoteEditor>("");
+                    }
                 } else if (result == rcal::CreateItemResult::cancel) {
                     createItemSelector.reset();
+                }
+            } else if (taskEditor) {
+                const auto result = taskEditor->handleInput(key, keyCode);
+                if (result == rcal::NoteEditorResult::save) {
+                    try {
+                        if (addingItem) header.addTask(header.selectedDate(), taskEditor->task());
+                        else header.updateSelectedTask(taskEditor->task());
+                        taskEditor.reset();
+                    } catch (const std::invalid_argument& error) {
+                        taskEditor->setError(error.what());
+                    }
+                } else if (result == rcal::NoteEditorResult::cancel) {
+                    taskEditor.reset();
+                }
+            } else if (eventEditor) {
+                const auto result = eventEditor->handleInput(key, keyCode);
+                if (result == rcal::NoteEditorResult::save) {
+                    try {
+                        if (addingItem) header.addEvent(header.selectedDate(), eventEditor->event());
+                        else header.updateSelectedEvent(eventEditor->event());
+                        eventEditor.reset();
+                    } catch (const std::invalid_argument& error) {
+                        eventEditor->setError(error.what());
+                    }
+                } else if (result == rcal::NoteEditorResult::cancel) {
+                    eventEditor.reset();
                 }
             } else if (noteEditor) {
                 const auto result = noteEditor->handleInput(key, keyCode);
                 if (result == rcal::NoteEditorResult::save) {
-                    if (addingItem) {
-                        if (editingItemType == rcal::DayItemType::note)
+                    try {
+                        if (addingItem) {
                             header.addNote(header.selectedDate(), noteEditor->note());
-                        else if (editingItemType == rcal::DayItemType::task)
-                            header.addTask(header.selectedDate(), noteEditor->note());
-                        else
-                            header.addEvent(header.selectedDate(), noteEditor->note());
-                    } else {
-                        header.updateSelectedItem(noteEditor->note());
+                        } else {
+                            header.updateSelectedItem(noteEditor->note());
+                        }
+                        noteEditor.reset();
+                        editorError.clear();
+                    } catch (const std::invalid_argument& error) {
+                        editorError = error.what();
                     }
-                    noteEditor.reset();
                 } else if (result == rcal::NoteEditorResult::cancel) {
                     noteEditor.reset();
+                    editorError.clear();
                 }
+            } else if (!keyCode && key == L'?') {
+                helpWindow = std::make_unique<rcal::HelpWindow>();
             } else if (!keyCode && (key == L'c' || key == L'C')) {
                 colorSelector = std::make_unique<rcal::ColorSelector>(
                     header.colors(), has_colors() ? COLORS : 0);
@@ -130,7 +189,11 @@ int main(int argc, char** argv)
                 const std::string item = header.selectedItemText();
                 if (!item.empty()) {
                     addingItem = false;
-                    noteEditor = std::make_unique<rcal::NoteEditor>(item);
+                    if (const auto* event = header.selectedEvent())
+                        eventEditor = std::make_unique<rcal::EventEditor>(*event);
+                    else if (const auto* task = header.selectedTask())
+                        taskEditor = std::make_unique<rcal::TaskEditor>(*task);
+                    else noteEditor = std::make_unique<rcal::NoteEditor>(item);
                 }
             } else {
                 const rcal::InputResult result = header.handleInput(

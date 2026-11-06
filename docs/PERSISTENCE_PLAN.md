@@ -38,8 +38,8 @@ The first persistent data is user-entered metadata:
 - Work status for a date: unspecified, workday, travelling, out-of-office
   working, compensatory leave, or vacation.
 - Multiple independently editable diary/list notes for a date.
-- Ordered tasks with a completion state.
-- Date-bound events with an optional local `HH:MM` time.
+- Ordered tasks with a completion state and optional due date/time.
+- Events with inclusive start/end dates and optional local `HH:MM` times.
 - Stable identity and ordering for each record type.
 
 Calendar facts such as ISO weeks and Norwegian holidays remain calculated by
@@ -64,10 +64,12 @@ public:
     virtual void updateNote(const NoteId& id, std::string text) = 0;
     virtual void deleteNote(const NoteId& id) = 0;
     virtual Task addTask(const Date& date, std::string text,
-                         std::size_t position) = 0;
+                         std::size_t position, std::string dueDate = "",
+                         std::string dueTime = "") = 0;
     virtual void setTaskCompleted(const TaskId& id, bool completed) = 0;
     virtual Event addEvent(const Date& date, std::string time, std::string text,
-                           std::size_t position) = 0;
+                           std::size_t position, std::string startDate = "",
+                           std::string endDate = "", std::string endTime = "") = 0;
 };
 ```
 
@@ -76,7 +78,7 @@ edit without changing the in-memory model or database.
 
 `moveNote` remains deferred until the TUI exposes note reordering.
 
-## Schema version 2
+## Schema version 4
 
 ```sql
 CREATE TABLE day_info (
@@ -101,6 +103,8 @@ CREATE TABLE tasks (
     position INTEGER NOT NULL,
     text TEXT NOT NULL,
     completed INTEGER NOT NULL DEFAULT 0,
+    due_date TEXT NOT NULL DEFAULT '',
+    due_time TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -110,15 +114,36 @@ CREATE TABLE events (
     date TEXT NOT NULL,
     position INTEGER NOT NULL,
     time TEXT NOT NULL DEFAULT '',
+    start_date TEXT NOT NULL DEFAULT '',
+    end_date TEXT NOT NULL DEFAULT '',
+    end_time TEXT NOT NULL DEFAULT '',
     text TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 ```
 
-Dates use ISO `YYYY-MM-DD` text. Notes should receive stable IDs rather than be
-identified by their current row number. UUIDs are a likely choice because they
-also prepare the model for future multi-device synchronization.
+Version 3 adds `tasks.due_date`, `tasks.due_time`, and `events.start_date` in
+the schema-opening transaction. Existing deadlines remain empty and existing
+event start dates are initialized from `events.date`.
+
+Version 4 adds `events.end_date` and `events.end_time`, initializing old events
+to a one-day range on their start date. A range index covers `start_date` and
+`end_date`. Versions 1 through 3 migrate automatically, once, in a transaction.
+Future schema versions are rejected.
+
+Task `date` is the filing date; changing a deadline does not move a task.
+For events, `date` retains creation-day context for compatibility; visibility
+is determined solely by `start_date <= selected_date <= end_date`. Each event
+is stored once with a stable ID. All daily `DayInfo` views load matching events,
+and mutations invalidate cached occurrences across the calendar. The in-memory
+backend similarly keeps one event record and builds the daily views from it.
+
+Dates use ISO `YYYY-MM-DD` text, times use local `HH:MM`, and empty task due
+fields mean no deadline. Overdue state is calculated rather than persisted.
+Date-only deadlines expire after the entire local day. Event endpoints are
+inclusive calendar dates, including midnight ends. Optional missing times are
+interpreted as beginning/end of day when validating chronological order.
 
 Schema changes use transactions and SQLite's `PRAGMA user_version`. Every
 migration must be forward-only, tested, and safe to run once when opening an
@@ -151,7 +176,10 @@ Storage tests use a temporary database and currently cover:
 - Multiple notes on one date, including stable ordering.
 - Note update and deletion without affecting other notes or day metadata.
 - Task completion and timed-event persistence after reopening.
-- Migration from schema version 1.
+- Migration from schema versions 1, 2, and 3, including reopening migrated data.
+- Inclusive multi-day events, leap days, month/year boundaries, and edits or
+  deletion from middle dates, with persistent and in-memory storage.
+- Schedule round trips, validation, deadline clearing, and overdue boundaries.
 - UTF-8 note text.
 
 Future coverage should add transaction rollback on failure and every supported

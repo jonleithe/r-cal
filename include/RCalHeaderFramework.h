@@ -44,7 +44,12 @@ struct HeaderColors{
     ColorStyle holiday{"red", "default", true, false, false};
     ColorStyle currentDay{"black", "yellow", true, false, false};
     ColorStyle selectedDay{"default", "blue", false, false, false};
+    ColorStyle selectedItem{"black", "cyan", true, false, false};
     ColorStyle timeInfo;
+    ColorStyle notes{"white", "default"};
+    ColorStyle tasks{"yellow", "default"};
+    ColorStyle overdueTask{"red", "default", true, false, false};
+    ColorStyle events{"cyan", "default"};
     ColorStyle grid;
     ColorStyle statusBar{"black", "white", false, false, false};
 };
@@ -138,9 +143,16 @@ public:
     void setDayInfo(Date date, DayInfo info);
     void addNote(Date date, std::string note);
     void addTask(Date date, std::string task);
+    void addTask(Date date, Task task);
+    void updateSelectedTask(Task task);
+    const Task* selectedTask() const noexcept;
     void addEvent(Date date, std::string event);
+    void addEvent(Date date, Event event);
+    void updateSelectedEvent(Event event);
+    const Event* selectedEvent() const noexcept;
     void updateSelectedNote(std::string note);
     void updateSelectedItem(std::string text);
+    bool deleteSelectedItem();
     void moveNoteSelection(int rows);
     void toggleSelectedTask();
     bool removeDayInfo(Date date);
@@ -161,6 +173,7 @@ private:
     void rebuildBufferedTimeline(Date selected, std::size_t visibleDays,
                                  std::size_t selectedOffset);
     void loadDayInfo(Date date);
+    void refreshEventViews(const EventId& id, const Event* event);
     void loadTimelineDayInformation();
     void discardEmptyDayInfo(Date date);
     std::size_t itemCount(const DayInfo& info) const noexcept;
@@ -172,6 +185,8 @@ private:
     std::vector<TimelineDay> timeline_;
     std::map<long long, DayInfo> dayInformation_;
     std::shared_ptr<CalendarStore> calendarStore_;
+    std::map<EventId, Event> memoryEvents_;
+    unsigned long long nextEventId_ = 0;
     Date selectedDate_;
     std::size_t selectedDayIndex_ = 0;
     std::size_t firstVisibleDay_ = 0;

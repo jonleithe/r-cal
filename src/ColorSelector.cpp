@@ -13,20 +13,21 @@
 namespace rcal {
 namespace {
 
-constexpr std::size_t elementCount = 14;
+constexpr std::size_t elementCount = 19;
 constexpr std::size_t rowCount = elementCount * 2;
 
 const std::array<const char*, elementCount> elementLabels{{
     "Label", "Year", "Month", "Week number", "Day of year", "Date",
     "Day name", "Weekend", "Holiday", "Current day", "Selected day",
-    "Time info", "Grid", "Status bar"
+    "Time info", "Grid", "Status bar", "Notes", "Tasks", "Events", "Selected item", "Overdue task"
 }};
 
 const std::array<const char*, elementCount> configKeys{{
     "color.label", "color.year", "color.month", "color.week_number",
     "color.day_of_year", "color.date", "color.day_name", "color.weekend",
     "color.holiday", "color.current_day", "color.selected_day",
-    "color.time_info", "color.grid", "color.status_bar"
+    "color.time_info", "color.grid", "color.status_bar",
+    "color.notes", "color.tasks", "color.events", "color.selected_item", "color.overdue_task"
 }};
 
 std::string colorName(int color) {
@@ -107,7 +108,12 @@ ColorStyle& ColorSelector::style(std::size_t element) {
         case 10: return colors_.selectedDay;
         case 11: return colors_.timeInfo;
         case 12: return colors_.grid;
-        default: return colors_.statusBar;
+        case 13: return colors_.statusBar;
+        case 14: return colors_.notes;
+        case 15: return colors_.tasks;
+        case 16: return colors_.events;
+        case 17: return colors_.selectedItem;
+        default: return colors_.overdueTask;
     }
 }
 
@@ -180,14 +186,18 @@ void ColorSelector::render(WINDOW* parent) {
         : layoutPaletteWidth;
     const int pairBase = has_colors() ? maximumPair - paletteWidth + 1 : 0;
     const int visibleRows = height - 4;
-    const std::size_t firstRow = selectedRow_ < static_cast<std::size_t>(visibleRows)
-        ? 0 : selectedRow_ - static_cast<std::size_t>(visibleRows) + 1;
+    const auto visibleRowCount = static_cast<std::size_t>(visibleRows);
+    const auto lastFirstRow = rowCount > visibleRowCount ? rowCount - visibleRowCount : 0;
+    firstVisibleRow_ = std::min(firstVisibleRow_, lastFirstRow);
+    if (selectedRow_ < firstVisibleRow_) firstVisibleRow_ = selectedRow_;
+    else if (selectedRow_ >= firstVisibleRow_ + visibleRowCount)
+        firstVisibleRow_ = selectedRow_ - visibleRowCount + 1;
     const std::size_t selectedColorIndex = palettePositions_[selectedRow_];
     const std::size_t firstColor = selectedColorIndex < static_cast<std::size_t>(paletteWidth)
         ? 0 : selectedColorIndex - static_cast<std::size_t>(paletteWidth) + 1;
 
     for (int visible = 0; visible < visibleRows; ++visible) {
-        const std::size_t row = firstRow + static_cast<std::size_t>(visible);
+        const std::size_t row = firstVisibleRow_ + static_cast<std::size_t>(visible);
         if (row >= rowCount) break;
         const int y = visible + 2;
         const ColorStyle& current = style(row / 2);
@@ -245,7 +255,8 @@ void saveColorsToConfig(const std::string& path, const HeaderColors& colors) {
         &colors.label, &colors.year, &colors.month, &colors.weekNumber,
         &colors.dayOfYear, &colors.date, &colors.dayName, &colors.weekend,
         &colors.holiday, &colors.currentDay, &colors.selectedDay,
-        &colors.timeInfo, &colors.grid, &colors.statusBar
+        &colors.timeInfo, &colors.grid, &colors.statusBar,
+        &colors.notes, &colors.tasks, &colors.events, &colors.selectedItem, &colors.overdueTask
     }};
     std::array<bool, elementCount> found{};
     for (std::string& currentLine : lines) {

@@ -34,12 +34,17 @@ struct Task {
     TaskId id;
     std::string text;
     bool completed = false;
+    std::string dueDate;
+    std::string dueTime;
 };
 
 struct Event {
     EventId id;
     std::string time;
     std::string text;
+    std::string startDate;
+    std::string endDate;
+    std::string endTime;
 };
 
 struct DayInfo {

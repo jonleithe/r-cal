@@ -136,7 +136,7 @@ int main() {
     holidays.addEvent({2024, 5, 3}, "09:30 Planleggingsmøte");
     assert(holidays.infoIndicator({2024, 5, 3})[4] == 'E');
     assert(holidays.selectedItemType() == rcal::DayItemType::event);
-    assert(holidays.selectedItemText() == "09:30 Planleggingsmøte");
+    assert(holidays.selectedItemText() == "start:2024-05-03 09:30 Planleggingsmøte");
     holidays.updateSelectedItem("10:00 Endret møte");
     assert(holidays.dayInfo({2024, 5, 3})->events[0].time == "10:00");
     holidays.moveNoteSelection(-1);
@@ -197,6 +197,23 @@ int main() {
     assert(selector.colors().label.background == "black");
     assert(selector.colors().label.underline);
 
+    // Selected-item foreground and background can be edited independently.
+    while (selector.selectedRow() < 34) selector.handleInput(KEY_DOWN);
+    selector.handleInput(KEY_RIGHT);
+    assert(selector.colors().selectedItem.foreground == "red");
+    selector.handleInput(KEY_DOWN);
+    selector.handleInput(KEY_LEFT);
+    assert(selector.colors().selectedItem.background == "magenta");
+    selector.handleInput('b');
+    assert(!selector.colors().selectedItem.bold);
+
+    selector.handleInput(KEY_DOWN);
+    selector.handleInput(KEY_RIGHT);
+    assert(selector.colors().overdueTask.foreground == "green");
+    selector.handleInput(KEY_DOWN);
+    selector.handleInput(KEY_RIGHT);
+    assert(selector.colors().overdueTask.background == "black");
+
     const std::string savedConfig = std::string(RCAL_SOURCE_DIR) + "/build/color-selector-test.conf";
     {
         std::ofstream output(savedConfig);
@@ -211,5 +228,12 @@ int main() {
                           ",black,bold,underline") != std::string::npos);
     assert(savedText.find("color.grid=") != std::string::npos);
     assert(savedText.find("color.status_bar=") != std::string::npos);
+    const auto reloaded = rcal::RCalHeaderFramework::fromConfigFile(savedConfig);
+    assert(reloaded.colors().selectedItem.foreground == "red");
+    assert(reloaded.colors().selectedItem.background == "magenta");
+    assert(!reloaded.colors().selectedItem.bold);
+    assert(reloaded.colors().overdueTask.foreground == "green");
+    assert(reloaded.colors().overdueTask.background == "black");
+    assert(reloaded.colors().overdueTask.bold);
     std::remove(savedConfig.c_str());
 }

@@ -1,5 +1,6 @@
 #include "RCalHeaderFramework.h"
 #include "CalendarStore.h"
+#include "Scheduling.h"
 
 #include <algorithm>
 #include <array>
@@ -47,17 +48,6 @@ std::vector<std::string> split(const std::string& value, char delimiter) {
     return result;
 }
 // ——— End of split() ——————————————————————————————————————————————————————————
-
-std::pair<std::string, std::string> splitEventText(const std::string& value) {
-    const std::string text = trim(value);
-    if (text.size() > 6 && text[2] == ':' && text[5] == ' ' &&
-        std::isdigit(static_cast<unsigned char>(text[0])) &&
-        std::isdigit(static_cast<unsigned char>(text[1])) &&
-        std::isdigit(static_cast<unsigned char>(text[3])) &&
-        std::isdigit(static_cast<unsigned char>(text[4])))
-        return {text.substr(0, 5), trim(text.substr(6))};
-    return {"", text};
-}
 
 long parseLong(const std::string& value, const std::string& key, long minimum,
                long maximum) {
@@ -479,7 +469,12 @@ void RCalHeaderFramework::loadConfigFile(const std::string& path) {
             else if (key == "color.weekend") newColors.weekend = parseStyle(value);
             else if (key == "color.holiday") newColors.holiday = parseStyle(value);
             else if (key == "color.current_day") newColors.currentDay = parseStyle(value);
+            else if (key == "color.selected_item") newColors.selectedItem = parseStyle(value);
             else if (key == "color.selected_day") newColors.selectedDay = parseStyle(value);
+            else if (key == "color.notes") newColors.notes = parseStyle(value);
+            else if (key == "color.overdue_task") newColors.overdueTask = parseStyle(value);
+            else if (key == "color.tasks") newColors.tasks = parseStyle(value);
+            else if (key == "color.events") newColors.events = parseStyle(value);
             else if (key == "color.time_info") newColors.timeInfo = parseStyle(value);
             else if (key == "color.grid") newColors.grid = parseStyle(value);
             else if (key == "color.status_bar") newColors.statusBar = parseStyle(value);
@@ -553,11 +548,13 @@ std::string RCalHeaderFramework::selectedItemText() const {
     if (!info) return {};
     if (selectedItemType_ == DayItemType::note && selectedItemIndex_ < info->notes.size())
         return info->notes[selectedItemIndex_].text;
-    if (selectedItemType_ == DayItemType::task && selectedItemIndex_ < info->tasks.size())
-        return info->tasks[selectedItemIndex_].text;
+    if (selectedItemType_ == DayItemType::task && selectedItemIndex_ < info->tasks.size()) {
+        const Task& task = info->tasks[selectedItemIndex_];
+        return scheduledText(task.dueDate, task.dueTime, task.text, true);
+    }
     if (selectedItemType_ == DayItemType::event && selectedItemIndex_ < info->events.size()) {
         const Event& event = info->events[selectedItemIndex_];
-        return event.time.empty() ? event.text : event.time + " " + event.text;
+        return scheduledText(event.startDate, event.time, event.text, false);
     }
     return {};
 }
@@ -656,6 +653,7 @@ void RCalHeaderFramework::setColors(HeaderColors colors)
 
 void RCalHeaderFramework::setCalendarStore(std::shared_ptr<CalendarStore> store) {
     calendarStore_ = std::move(store);
+    memoryEvents_.clear();
     dayInformation_.clear();
     selectedItemType_ = DayItemType::note;
     selectedItemIndex_ = 0;
@@ -689,35 +687,147 @@ void RCalHeaderFramework::addNote(Date date, std::string note) {
 
 
 
-void RCalHeaderFramework::addTask(Date date, std::string task) {
+const Task* RCalHeaderFramework::selectedTask() const noexcept {
+    const auto* info = dayInfo(selectedDate_);
+    return info && selectedItemType_ == DayItemType::task && selectedItemIndex_ < info->tasks.size()
+        ? &info->tasks[selectedItemIndex_] : nullptr;
+}
+
+void RCalHeaderFramework::addTask(Date date, std::string text) {
+    const auto parts = parseScheduledText(text, true);
+    addTask(date, Task{{}, parts.text, false, parts.date, parts.time});
+}
+
+void RCalHeaderFramework::addTask(Date date, Task task) {
     validateDate(date);
-    if (task.empty()) return;
+    if (task.text.empty()) return;
+    validateSchedule(task.dueDate, task.dueTime);
+    if (task.dueDate.empty() && !task.dueTime.empty())
+        throw std::invalid_argument("task due time requires a due date");
     loadDayInfo(date);
     DayInfo& info = dayInformation_[daysFromCivil(date.year, date.month, date.day)];
     if (calendarStore_)
-        info.tasks.push_back(calendarStore_->addTask(date, std::move(task), info.tasks.size()));
+        info.tasks.push_back(calendarStore_->addTask(date, task.text, info.tasks.size(), task.dueDate, task.dueTime));
     else
-        info.tasks.push_back({{}, std::move(task), false});
+        info.tasks.push_back({{}, task.text, false, task.dueDate, task.dueTime});
     if (sameDate(date, selectedDate_)) {
         selectedItemType_ = DayItemType::task;
         selectedItemIndex_ = info.tasks.size() - 1;
     }
 }
 
-void RCalHeaderFramework::addEvent(Date date, std::string event) {
-    const auto parts = splitEventText(event);
-    if (parts.second.empty()) return;
+void RCalHeaderFramework::updateSelectedTask(Task task) {
+    if (!selectedTask()) return;
+    if (!task.text.empty()) {
+        validateSchedule(task.dueDate, task.dueTime);
+        if (task.dueDate.empty() && !task.dueTime.empty())
+            throw std::invalid_argument("task due time requires a due date");
+    }
+    const auto key = daysFromCivil(selectedDate_.year, selectedDate_.month, selectedDate_.day);
+    auto found = dayInformation_.find(key);
+    auto& info = found->second;
+    auto& selected = info.tasks[selectedItemIndex_];
+    if (task.text.empty()) {
+        if (calendarStore_) calendarStore_->deleteTask(selected.id);
+        info.tasks.erase(info.tasks.begin() + static_cast<std::ptrdiff_t>(selectedItemIndex_));
+        if (itemCount(info)) selectFlatIndex(info, 0);
+        else { selectedItemType_ = DayItemType::note; selectedItemIndex_ = 0; }
+        discardEmptyDayInfo(selectedDate_);
+    } else {
+        if (calendarStore_) calendarStore_->updateTask(selected.id, task.text, task.dueDate, task.dueTime);
+        // Editing scheduling or text preserves the record identity and completion state.
+        selected.text = task.text;
+        selected.dueDate = task.dueDate;
+        selected.dueTime = task.dueTime;
+    }
+}
+
+const Event* RCalHeaderFramework::selectedEvent() const noexcept {
+    const auto* info = dayInfo(selectedDate_);
+    return info && selectedItemType_ == DayItemType::event && selectedItemIndex_ < info->events.size()
+        ? &info->events[selectedItemIndex_] : nullptr;
+}
+
+void RCalHeaderFramework::refreshEventViews(const EventId& id, const Event* event) {
+    // Drop every cached occurrence before rebuilding views from the single record.
+    for (auto& day : dayInformation_) {
+        auto& events = day.second.events;
+        events.erase(std::remove_if(events.begin(), events.end(),
+            [&](const Event& existing) { return existing.id == id; }), events.end());
+    }
+    if (!calendarStore_) {
+        memoryEvents_.erase(id);
+        if (event) memoryEvents_[id] = *event;
+    }
+    std::vector<Date> dates;
+    for (const auto& day : dayInformation_) dates.push_back(civilFromDays(day.first));
+    for (const auto& day : timeline_) dates.push_back(day.date);
+    dates.push_back(selectedDate_);
+    if (event) {
+        dates.push_back(parseDate(event->startDate));
+        dates.push_back(parseDate(event->endDate));
+    }
+    for (const auto& date : dates) loadDayInfo(date);
+}
+
+void RCalHeaderFramework::addEvent(Date date, std::string text) {
+    const auto parts = parseScheduledText(text, false);
+    if (parts.text.empty()) return;
+    addEvent(date, Event{{}, parts.time, parts.text, parts.date, {}, {}});
+}
+
+void RCalHeaderFramework::addEvent(Date date, Event event) {
     validateDate(date);
-    loadDayInfo(date);
-    DayInfo& info = dayInformation_[daysFromCivil(date.year, date.month, date.day)];
-    if (calendarStore_)
-        info.events.push_back(calendarStore_->addEvent(date, parts.first, parts.second,
-                                                        info.events.size()));
-    else
-        info.events.push_back({{}, parts.first, parts.second});
-    if (sameDate(date, selectedDate_)) {
-        selectedItemType_ = DayItemType::event;
-        selectedItemIndex_ = info.events.size() - 1;
+    if (event.text.empty()) return;
+    normalizeEvent(event, calendarDateString(date));
+    if (calendarStore_) {
+        const auto* info = dayInfo(date);
+        event = calendarStore_->addEvent(date, event.time, event.text,
+            info ? info->events.size() : 0, event.startDate, event.endDate, event.endTime);
+    } else {
+        event.id = "memory-event-" + std::to_string(++nextEventId_);
+    }
+    refreshEventViews(event.id, &event);
+    if (!eventOnDate(event, calendarDateString(selectedDate_))) selectDate(parseDate(event.startDate));
+    const auto* info = dayInfo(selectedDate_);
+    if (info) {
+        for (std::size_t i = 0; i < info->events.size(); ++i) {
+            if (info->events[i].id == event.id) {
+                selectedItemType_ = DayItemType::event;
+                selectedItemIndex_ = i;
+                break;
+            }
+        }
+    }
+}
+
+void RCalHeaderFramework::updateSelectedEvent(Event event) {
+    const auto* selected = selectedEvent();
+    if (!selected) return;
+    const Event previous = *selected;
+    event.id = previous.id;
+    if (event.text.empty()) {
+        if (calendarStore_) calendarStore_->deleteEvent(event.id);
+        refreshEventViews(event.id, nullptr);
+    } else {
+        normalizeEvent(event, previous.startDate);
+        if (calendarStore_) calendarStore_->updateEvent(event.id, event.time, event.text,
+            event.startDate, event.endDate, event.endTime);
+        refreshEventViews(event.id, &event);
+    }
+    const auto* info = dayInfo(selectedDate_);
+    if (info && itemCount(*info)) {
+        for (std::size_t i = 0; i < info->events.size(); ++i) {
+            if (info->events[i].id == event.id) {
+                selectedItemType_ = DayItemType::event;
+                selectedItemIndex_ = i;
+                return;
+            }
+        }
+        selectFlatIndex(*info, 0);
+    } else {
+        selectedItemType_ = DayItemType::note;
+        selectedItemIndex_ = 0;
     }
 }
 
@@ -751,48 +861,37 @@ void RCalHeaderFramework::updateSelectedNote(std::string note) {
 
 
 void RCalHeaderFramework::updateSelectedItem(std::string text) {
+    if (selectedItemType_ == DayItemType::event) {
+        const auto* selected = selectedEvent();
+        if (!selected) return;
+        Event event = *selected;
+        const auto parts = parseScheduledText(text, false);
+        event.text = parts.text;
+        event.time = parts.time;
+        if (!parts.date.empty() && parts.date != event.startDate) {
+            event.startDate = parts.date;
+            event.endDate = parts.date;
+        }
+        updateSelectedEvent(event);
+        return;
+    }
     if (selectedItemType_ == DayItemType::note) {
         updateSelectedNote(std::move(text));
         return;
     }
-    const long long key = daysFromCivil(selectedDate_.year, selectedDate_.month,
-                                        selectedDate_.day);
-    auto found = dayInformation_.find(key);
-    if (found == dayInformation_.end()) return;
-    DayInfo& info = found->second;
-    bool removed = false;
-    if (selectedItemType_ == DayItemType::task) {
-        if (selectedItemIndex_ >= info.tasks.size()) return;
-        if (text.empty()) {
-            if (calendarStore_) calendarStore_->deleteTask(info.tasks[selectedItemIndex_].id);
-            info.tasks.erase(info.tasks.begin() + static_cast<std::ptrdiff_t>(selectedItemIndex_));
-            removed = true;
-        } else {
-            if (calendarStore_) calendarStore_->updateTask(info.tasks[selectedItemIndex_].id, text);
-            info.tasks[selectedItemIndex_].text = std::move(text);
-        }
-    } else {
-        if (selectedItemIndex_ >= info.events.size()) return;
-        const auto parts = splitEventText(text);
-        if (parts.second.empty()) {
-            if (calendarStore_) calendarStore_->deleteEvent(info.events[selectedItemIndex_].id);
-            info.events.erase(info.events.begin() + static_cast<std::ptrdiff_t>(selectedItemIndex_));
-            removed = true;
-        } else {
-            if (calendarStore_)
-                calendarStore_->updateEvent(info.events[selectedItemIndex_].id, parts.first, parts.second);
-            info.events[selectedItemIndex_].time = parts.first;
-            info.events[selectedItemIndex_].text = parts.second;
-        }
-    }
-    if (itemCount(info) == 0 && info.workStatus == WorkStatus::unspecified &&
-        info.taskCount == 0 && info.eventCount == 0) {
-        dayInformation_.erase(found);
-        selectedItemType_ = DayItemType::note;
-        selectedItemIndex_ = 0;
-    } else if (removed) {
-        selectFlatIndex(info, itemCount(info) - 1);
-    }
+    const auto parts = parseScheduledText(text, true);
+    if (!text.empty() && parts.text.empty()) throw std::invalid_argument("task description is required");
+    updateSelectedTask(Task{{}, parts.text, false, parts.date, parts.time});
+}
+
+bool RCalHeaderFramework::deleteSelectedItem() {
+    if (selectedItemText().empty()) return false;
+    const auto* info = dayInfo(selectedDate_);
+    const auto index = selectedFlatIndex(*info);
+    updateSelectedItem("");
+    info = dayInfo(selectedDate_);
+    if (info && itemCount(*info)) selectFlatIndex(*info, std::min(index, itemCount(*info) - 1));
+    return true;
 }
 
 void RCalHeaderFramework::moveNoteSelection(int rows) {
@@ -857,14 +956,36 @@ void RCalHeaderFramework::clearSelectedWorkStatus() {
 
 
 void RCalHeaderFramework::loadDayInfo(Date date) {
-    if (!calendarStore_) return;
     const long long key = daysFromCivil(date.year, date.month, date.day);
-    DayInfo info = calendarStore_->loadDay(date);
+    DayInfo info;
+    if (calendarStore_) info = calendarStore_->loadDay(date);
+    else {
+        const auto found = dayInformation_.find(key);
+        if (found != dayInformation_.end()) info = found->second;
+        for (const auto& record : memoryEvents_) {
+            const auto& event = record.second;
+            if (eventOnDate(event, calendarDateString(date)) &&
+                std::none_of(info.events.begin(), info.events.end(),
+                    [&](const Event& existing) { return existing.id == event.id; }))
+                info.events.push_back(event);
+        }
+        std::stable_sort(info.events.begin(), info.events.end(), [](const Event& a, const Event& b) {
+            if (a.startDate != b.startDate) return a.startDate < b.startDate;
+            if (a.time.empty() != b.time.empty()) return !a.time.empty();
+            return a.time < b.time;
+        });
+    }
     if (info.workStatus == WorkStatus::unspecified && info.notes.empty() && info.tasks.empty() &&
         info.events.empty() && info.taskCount == 0 && info.eventCount == 0) {
         dayInformation_.erase(key);
     } else {
         dayInformation_[key] = std::move(info);
+        const auto& loaded = dayInformation_[key];
+        if (sameDate(date, selectedDate_) && itemCount(loaded)) {
+            const std::size_t count = selectedItemType_ == DayItemType::note ? loaded.notes.size()
+                : selectedItemType_ == DayItemType::task ? loaded.tasks.size() : loaded.events.size();
+            if (selectedItemIndex_ >= count) selectFlatIndex(loaded, 0);
+        }
     }
 }
 
@@ -903,8 +1024,7 @@ void RCalHeaderFramework::selectFlatIndex(const DayInfo& info, std::size_t index
 
 
 void RCalHeaderFramework::loadTimelineDayInformation() {
-    if (!calendarStore_) return;
-    dayInformation_.clear();
+    if (calendarStore_) dayInformation_.clear();
     for (const TimelineDay& day : timeline_) loadDayInfo(day.date);
 }
 
@@ -1084,6 +1204,7 @@ InputResult RCalHeaderFramework::handleInput(int key, WINDOW* window) {
         case 'f': toggleSelectedWorkStatus(WorkStatus::vacation); return InputResult::redraw;
         case ' ': clearSelectedWorkStatus(); return InputResult::redraw;
         case 'x': toggleSelectedTask(); return InputResult::redraw;
+        case KEY_DC: return deleteSelectedItem() ? InputResult::redraw : InputResult::ignored;
         case 'q':
         case 'Q':
         case 27:
@@ -1253,7 +1374,7 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left, bool addingNo
         put(window, top + 9, left,
             "Notes " + std::to_string(noteCount) + "  Tasks " + std::to_string(taskCount) +
                 "  Events " + std::to_string(eventCount) +
-                "  Up/Down: select  Enter: edit  x: complete  Insert: create",
+                "  Up/Down: select  Enter: edit  Del: delete  x: complete  Insert: create  ?: help",
             styles.attributes(colors_.label));
         const int availableRows = std::max(0, windowHeight - (top + 10) - 2);
         const std::size_t itemTotal = selectedInfo ? itemCount(*selectedInfo) : 0;
@@ -1262,20 +1383,33 @@ int RCalHeaderFramework::render(WINDOW* window, int top, int left, bool addingNo
             : (selectedInfo ? selectedFlatIndex(*selectedInfo) : 0);
         if (availableRows > 0 && activeItem >= static_cast<std::size_t>(availableRows))
             firstItem = activeItem - static_cast<std::size_t>(availableRows) + 1;
+        const auto today = localDateString();
+        const auto now = localTimeString();
         for (int row = 0; row < availableRows && firstItem + row < itemTotal; ++row) {
             const std::size_t itemIndex = firstItem + static_cast<std::size_t>(row);
+            const bool overdue = itemIndex >= noteCount && itemIndex < noteCount + taskCount &&
+                taskOverdue(selectedInfo->tasks[itemIndex - noteCount], today, now);
+            const ColorStyle& baseStyle = itemIndex < noteCount ? colors_.notes
+                : itemIndex < noteCount + taskCount
+                    ? (overdue ? colors_.overdueTask : colors_.tasks) : colors_.events;
             const ColorStyle itemStyle = itemIndex == selectedFlatIndex(*selectedInfo)
-                ? highlightedStyle(colors_.timeInfo, colors_.selectedDay)
-                : colors_.timeInfo;
+                ? colors_.selectedItem : baseStyle;
             std::string text;
             if (itemIndex < noteCount) {
                 text = "Note: " + selectedInfo->notes[itemIndex].text;
             } else if (itemIndex < noteCount + taskCount) {
                 const Task& task = selectedInfo->tasks[itemIndex - noteCount];
-                text = std::string(task.completed ? "[x] Task: " : "[ ] Task: ") + task.text;
+                text = std::string(overdue ? "! " : "") +
+                    (task.completed ? "[x] Task: " : "[ ] Task: ") + task.text;
+                if (!task.dueDate.empty())
+                    text += "  [due " + task.dueDate + (task.dueTime.empty() ? "" : " " + task.dueTime) + "]";
+                if (overdue) text += " OVERDUE";
             } else {
                 const Event& event = selectedInfo->events[itemIndex - noteCount - taskCount];
-                text = "Event: " + (event.time.empty() ? "" : event.time + " ") + event.text;
+                text = "Event: " + event.text + "  [start " +
+                    (event.startDate.empty() ? calendarDateString(selectedDate_) : event.startDate) +
+                    (event.time.empty() ? "" : " " + event.time) + " to " +
+                    event.endDate + (event.endTime.empty() ? "" : " " + event.endTime) + "]";
             }
             put(window, top + 10 + row, left,
                 " " + std::to_string(itemIndex + 1) + ". " + text, styles.attributes(itemStyle));
