@@ -7,6 +7,9 @@ cell_width=5
 show_grid=true
 holiday_country=NO
 
+# Optional explicit SQLite database path. The default follows XDG data paths.
+# data_file=/path/to/r-cal.db
+
 # Localization. Lists require 12 months and 7 days (Monday first).
 month_names=Januar,Februar,Mars,April,Mai,Juni,Juli,August,September,Oktober,November,Desember
 day_names=Man,Tir,Ons,Tor,Fre,Lør,Søn

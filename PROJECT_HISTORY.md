@@ -3,7 +3,27 @@
 This is a concise, chronological record of major milestones and decisions for
 `r-cal`. It is not a substitute for Git history or a release changelog.
 
+## 2026-11-06
+
+### Local tasks and events added
+
+- Added SQLite schema version 2 with ordered task records, completion state,
+  and date-bound event records with an optional local time.
+- Extended the shared item editor and navigation so notes, tasks, and events
+  can be created, selected, edited, and removed; `x` toggles a selected task.
+
 ## 2026-11-05
+
+### SQLite day-metadata persistence implemented
+
+- Added the `CalendarStore` boundary and SQLite implementation with schema
+  versioning, transactional creation, stable note IDs, and temporary-database
+  coverage.
+- Work-status and confirmed note edits now persist immediately to the XDG data
+  directory by default, with `data_file` available for an explicit database
+  location.
+- Kept calendar navigation and rendering independent of SQL; the framework
+  loads timeline metadata through the store and retains an in-memory view.
 
 ### Local-first persistence direction documented
 

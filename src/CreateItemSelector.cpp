@@ -11,8 +11,7 @@ namespace rcal {
 namespace {
 
 const std::array<const char*, 3> itemLabels{{
-    "Note", "Task (editor not implemented yet)",
-    "Event (editor not implemented yet)"
+    "Note", "Task", "Event (optional HH:MM prefix)"
 }};
 
 } // namespace
@@ -30,6 +29,8 @@ CreateItemResult CreateItemSelector::handleInput(int key) {
         case 'e': case 'E': selectedItem_ = 2; break;
         case '\n': case '\r': case KEY_ENTER:
             if (selectedItem_ == 0) return CreateItemResult::createNote;
+            if (selectedItem_ == 1) return CreateItemResult::createTask;
+            if (selectedItem_ == 2) return CreateItemResult::createEvent;
             break;
         case 27: return CreateItemResult::cancel;
         default: break;
@@ -57,8 +58,8 @@ void CreateItemSelector::render(WINDOW* parent) const {
         mvwaddnstr(dialog, static_cast<int>(item) + 3, 3, itemLabels[item], width - 6);
         if (item == selectedItem_) wattroff(dialog, A_REVERSE);
     }
-    if (selectedItem_ != 0)
-        mvwaddnstr(dialog, height - 2, 2, "This editor will be added later.", width - 4);
+    if (selectedItem_ == 2)
+        mvwaddnstr(dialog, height - 2, 2, "Example: 09:30 Team stand-up", width - 4);
 
     copywin(dialog, parent, 0, 0, top, left, top + height - 1, left + width - 1, 0);
     delwin(dialog);

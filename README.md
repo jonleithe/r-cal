@@ -6,9 +6,10 @@ year (DOY), date, day-name, and time-information rows.
 
 ## Build and test
 
-Requirements: a C++17 compiler, CMake 3.16 or newer, and curses development
-headers and libraries with wide-character support (`ncursesw` on Linux).
-The build locates `ncursesw` through `pkg-config`.
+Requirements: a C++17 compiler, CMake 3.16 or newer, SQLite development
+headers and library, and curses development headers and libraries with
+wide-character support (`ncursesw` on Linux). The build locates `ncursesw`
+through `pkg-config`.
 
 ```sh
 cmake -S . -B build
@@ -57,8 +58,9 @@ days remain. These values are configured with `buffer_days` and
 - Home or `n`: return to today.
 - `c`: open the color selector.
 - Insert: open the create-item chooser for a Note, Task, or Event.
-- Up/Down: select a note below the calendar.
-- Enter: edit the selected note.
+- Up/Down: select a note, task, or event below the calendar.
+- Enter: edit the selected item.
+- `x`: toggle completion of the selected task.
 - `w`, `t`, `o`, `a`, or `f`: toggle the selected date's work status.
 - Space: clear the selected date's work status.
 - `q`, `Q`, or Escape: quit.
@@ -103,23 +105,25 @@ The status bar at the bottom expands the selected date's active codes and
 counts into readable descriptions. Its appearance is configured with
 `color.status_bar` and can also be changed in the color selector.
 
-Each date can contain multiple independent diary or list-style notes. They are
-shown one per row below the calendar. Press Insert to open the create-item
-chooser, select Note, and press Enter. Use Up/Down in the normal view to select
-an existing note, then press Enter to edit it directly on its note row. New notes are edited on
-the next row in the list, which scrolls when necessary to keep the editor visible.
-The editor supports normal text entry, Left/Right, Home/End, Backspace, and
-Delete. Enter saves the note; Escape cancels the edit. Saving an existing note
-as empty removes it. Notes are UTF-8 text, including Norwegian characters.
+Each date can contain multiple independent diary/list-style notes, tasks, and
+events. Press Insert to open the create-item chooser, then use Up/Down in the
+normal view to select an existing item and Enter to edit it. Saving an existing
+item as empty removes it. Press `x` to complete or reopen the selected task.
 
-The create-item chooser also reserves Task and Event entries. Their editors
-are not implemented yet and are labelled accordingly in the menu.
+Events accept an optional 24-hour time prefix: enter `09:30 Team stand-up` to
+store a timed event, or omit the prefix for an all-day event. Events with times
+are listed before all-day events. Item text is UTF-8, including Norwegian
+characters.
 
 ## Persistence
 
-User-entered data is currently held in memory. The planned local-first SQLite
-backend, storage abstraction, schema, test strategy, and future synchronization
-options are documented in [docs/PERSISTENCE_PLAN.md](docs/PERSISTENCE_PLAN.md).
+User-entered work statuses, notes, tasks, and events are stored immediately in a local SQLite
+database. By default this is `$XDG_DATA_HOME/r-cal/r-cal.db`, or
+`~/.local/share/r-cal/r-cal.db` when `XDG_DATA_HOME` is unset. Set `data_file`
+in the configuration to use an explicit database path instead. The SQLite
+backend is isolated behind a storage interface; its schema, migration strategy,
+and future synchronization options are documented in
+[docs/PERSISTENCE_PLAN.md](docs/PERSISTENCE_PLAN.md).
 
 ## Norwegian holidays
 

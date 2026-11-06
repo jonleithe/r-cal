@@ -2,7 +2,7 @@
 
 ## Direction
 
-`r-cal` will start with local-first persistence backed by SQLite. SQLite is an
+`r-cal` uses local-first persistence backed by SQLite. SQLite is an
 embedded library, so users do not need to install, configure, or operate a
 MariaDB/PostgreSQL server. The optional `sqlite3` command-line program is useful
 for inspection but is not required at runtime.
@@ -11,11 +11,12 @@ The TUI and `RCalHeaderFramework` must not call SQLite directly. Persistence
 belongs behind a storage interface so another backend or synchronization layer
 can be added later without rewriting calendar navigation and rendering.
 
-## Proposed source layout
+## Source layout
 
 ```text
 include/
   CalendarStore.h
+  CalendarTypes.h
   SQLiteCalendarStore.h
 
 src/
@@ -25,25 +26,28 @@ tests/
   SQLiteCalendarStoreTest.cpp
 ```
 
-`CalendarStore` defines operations and persistent record types.
+`CalendarStore` defines operations and persistent record types. `CalendarTypes`
+holds the shared date, work-status, note, and day-information types.
 `SQLiteCalendarStore` owns the SQLite connection, prepared statements,
 transactions, schema creation, and migrations.
 
-## Initial responsibilities
+## Implemented responsibilities
 
 The first persistent data is user-entered metadata:
 
 - Work status for a date: unspecified, workday, travelling, out-of-office
   working, compensatory leave, or vacation.
 - Multiple independently editable diary/list notes for a date.
-- Stable note identity and ordering.
+- Ordered tasks with a completion state.
+- Date-bound events with an optional local `HH:MM` time.
+- Stable identity and ordering for each record type.
 
 Calendar facts such as ISO weeks and Norwegian holidays remain calculated by
 the calendar model. Imported tasks and events will later retain their external
 source and iCalendar UID so refreshes update records instead of duplicating
 them.
 
-## Proposed interface
+## Interface
 
 The exact signatures can evolve during implementation, but the boundary should
 cover operations rather than expose SQL:
@@ -53,20 +57,26 @@ class CalendarStore {
 public:
     virtual ~CalendarStore() = default;
 
-    virtual DayRecord loadDay(Date date) = 0;
-    virtual void saveWorkStatus(Date date, WorkStatus status) = 0;
-    virtual NoteRecord addNote(Date date, std::string text,
-                               std::size_t position) = 0;
-    virtual void updateNote(NoteId id, std::string text) = 0;
-    virtual void deleteNote(NoteId id) = 0;
-    virtual void moveNote(NoteId id, std::size_t position) = 0;
+    virtual DayInfo loadDay(const Date& date) = 0;
+    virtual void saveWorkStatus(const Date& date, WorkStatus status) = 0;
+    virtual Note addNote(const Date& date, std::string text,
+                         std::size_t position) = 0;
+    virtual void updateNote(const NoteId& id, std::string text) = 0;
+    virtual void deleteNote(const NoteId& id) = 0;
+    virtual Task addTask(const Date& date, std::string text,
+                         std::size_t position) = 0;
+    virtual void setTaskCompleted(const TaskId& id, bool completed) = 0;
+    virtual Event addEvent(const Date& date, std::string time, std::string text,
+                           std::size_t position) = 0;
 };
 ```
 
 Accepted edits should be written immediately. Escape continues to cancel an
 edit without changing the in-memory model or database.
 
-## Initial schema sketch
+`moveNote` remains deferred until the TUI exposes note reordering.
+
+## Schema version 2
 
 ```sql
 CREATE TABLE day_info (
@@ -84,6 +94,26 @@ CREATE TABLE notes (
 );
 
 CREATE INDEX notes_by_date_position ON notes(date, position);
+
+CREATE TABLE tasks (
+    id TEXT PRIMARY KEY,
+    date TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    completed INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE events (
+    id TEXT PRIMARY KEY,
+    date TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    time TEXT NOT NULL DEFAULT '',
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 ```
 
 Dates use ISO `YYYY-MM-DD` text. Notes should receive stable IDs rather than be
@@ -109,20 +139,23 @@ When `XDG_DATA_HOME` is unset, the usual location is:
 ~/.local/share/r-cal/r-cal.db
 ```
 
-A `data_file` configuration setting should allow an explicit alternative path.
+A `data_file` configuration setting allows an explicit alternative path.
 Parent directories should be created safely on first use.
 
 ## Testing
 
-Storage tests should use a temporary database and cover:
+Storage tests use a temporary database and currently cover:
 
 - Initial schema creation and reopening an existing database.
-- Work-status insert, update, toggle/clear, and persistence after reopening.
+- Work-status save/clear and persistence after reopening.
 - Multiple notes on one date, including stable ordering.
 - Note update and deletion without affecting other notes or day metadata.
-- Transaction rollback on failure.
-- Schema migration from every supported older version.
+- Task completion and timed-event persistence after reopening.
+- Migration from schema version 1.
 - UTF-8 note text.
+
+Future coverage should add transaction rollback on failure and every supported
+schema migration.
 
 An in-memory `CalendarStore` implementation or test double can keep framework
 and TUI tests independent of SQLite.
@@ -147,21 +180,14 @@ central service. It is not required for the first local persistence backend.
 
 ## Implementation sequence
 
-1. Confirm SQLite development headers and library are available on austfonna.
-2. Add SQLite discovery and linking in CMake.
-3. Define `CalendarStore` records and operations.
-4. Implement `SQLiteCalendarStore`, schema version 1, and migrations.
-5. Give existing notes stable IDs while preserving their displayed ordering.
-6. Load selected-date metadata through the store.
-7. Persist accepted work-status and note edits immediately.
-8. Add temporary-database tests and persistence-after-reopen coverage.
-9. Add backup/export before designing network synchronization.
+1. Add backup/export before designing network synchronization.
+2. Add note reordering and the corresponding transactional store operation.
+3. Add event duration, recurrence, and imported-calendar support.
 
 ## Open questions
 
-- Whether note IDs use UUIDv4, UUIDv7, or another locally generated format.
+- Whether note IDs should change from the current SQLite-generated random IDs
+  to UUIDv7 before synchronization work begins.
 - Whether timestamps are required in the first schema or added when note
   history and synchronization are implemented.
-- Whether `data_file` belongs in the existing configuration or a separate user
-  configuration file.
 - How imported task/event sources and refresh policies will be configured.

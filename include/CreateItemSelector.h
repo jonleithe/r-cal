@@ -10,6 +10,8 @@ namespace rcal {
 enum class CreateItemResult {
     editing,
     createNote,
+    createTask,
+    createEvent,
     cancel
 };
 

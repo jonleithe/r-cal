@@ -1,13 +1,28 @@
 #include "RCalHeaderFramework.h"
+#include "SQLiteCalendarStore.h"
 #include "ColorSelector.h"
 #include "CreateItemSelector.h"
 #include "NoteEditor.h"
 
 #include <curses.h>
 #include <clocale>
+#include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <memory>
+
+namespace {
+
+std::filesystem::path defaultDataFile() {
+    if (const char* dataHome = std::getenv("XDG_DATA_HOME"); dataHome && *dataHome)
+        return std::filesystem::path(dataHome) / "r-cal" / "r-cal.db";
+    if (const char* userHome = std::getenv("HOME"); userHome && *userHome)
+        return std::filesystem::path(userHome) / ".local" / "share" / "r-cal" / "r-cal.db";
+    throw std::runtime_error("cannot determine data directory; set XDG_DATA_HOME");
+}
+
+} // namespace
 
 int main(int argc, char** argv)
 {
@@ -16,15 +31,10 @@ int main(int argc, char** argv)
         std::setlocale(LC_ALL, "");
         const std::string config = argc > 1 ? argv[1] : "config/rcal.conf.example";
         auto header = rcal::RCalHeaderFramework::fromConfigFile(config);
-
-        
-        // rcal::DayInfo todayInfo;
-        // todayInfo.workStatus = rcal::WorkStatus::workday;
-        // todayInfo.notes.push_back("Example note");
-        // todayInfo.taskCount = 3;
-        // todayInfo.eventCount = 1;
-
-        // header.setDayInfo(header.selectedDate(), todayInfo);
+        const auto& configuredDataFile = header.options().dataFile;
+        header.setCalendarStore(std::make_shared<rcal::SQLiteCalendarStore>(
+            configuredDataFile.empty() ? defaultDataFile()
+                                       : std::filesystem::path(configuredDataFile)));
 
         // Initializes curses and returns the default screen window, also available as stdscr.
         initscr();
@@ -48,10 +58,11 @@ int main(int argc, char** argv)
         std::unique_ptr<rcal::ColorSelector> colorSelector;
         std::unique_ptr<rcal::CreateItemSelector> createItemSelector;
         std::unique_ptr<rcal::NoteEditor> noteEditor;
-        bool addingNote = false;
+        bool addingItem = false;
+        rcal::DayItemType editingItemType = rcal::DayItemType::note;
         while (running){
             erase();
-            header.render(stdscr, 0, 0, noteEditor && addingNote);
+            header.render(stdscr, 0, 0, noteEditor && addingItem);
 
             // Copies changes made to stdscr to the physical terminal.
             refresh();
@@ -59,8 +70,9 @@ int main(int argc, char** argv)
             if (createItemSelector) createItemSelector->render(stdscr);
             if (noteEditor) {
                 const auto* info = header.dayInfo(header.selectedDate());
-                const std::size_t index = addingNote
-                    ? (info ? info->notes.size() : 0) : header.selectedNoteIndex();
+                const std::size_t index = addingItem
+                    ? (info ? info->notes.size() + info->tasks.size() + info->events.size() : 0)
+                    : header.selectedItemFlatIndex();
                 noteEditor->render(stdscr, header.noteRow(stdscr, index), index);
             }
 
@@ -79,9 +91,14 @@ int main(int argc, char** argv)
                 }
             } else if (createItemSelector) {
                 const auto result = createItemSelector->handleInput(static_cast<int>(key));
-                if (result == rcal::CreateItemResult::createNote) {
+                if (result == rcal::CreateItemResult::createNote ||
+                    result == rcal::CreateItemResult::createTask ||
+                    result == rcal::CreateItemResult::createEvent) {
                     createItemSelector.reset();
-                    addingNote = true;
+                    addingItem = true;
+                    editingItemType = result == rcal::CreateItemResult::createTask
+                        ? rcal::DayItemType::task : result == rcal::CreateItemResult::createEvent
+                        ? rcal::DayItemType::event : rcal::DayItemType::note;
                     noteEditor = std::make_unique<rcal::NoteEditor>("");
                 } else if (result == rcal::CreateItemResult::cancel) {
                     createItemSelector.reset();
@@ -89,8 +106,16 @@ int main(int argc, char** argv)
             } else if (noteEditor) {
                 const auto result = noteEditor->handleInput(key, keyCode);
                 if (result == rcal::NoteEditorResult::save) {
-                    if (addingNote) header.addNote(header.selectedDate(), noteEditor->note());
-                    else header.updateSelectedNote(noteEditor->note());
+                    if (addingItem) {
+                        if (editingItemType == rcal::DayItemType::note)
+                            header.addNote(header.selectedDate(), noteEditor->note());
+                        else if (editingItemType == rcal::DayItemType::task)
+                            header.addTask(header.selectedDate(), noteEditor->note());
+                        else
+                            header.addEvent(header.selectedDate(), noteEditor->note());
+                    } else {
+                        header.updateSelectedItem(noteEditor->note());
+                    }
                     noteEditor.reset();
                 } else if (result == rcal::NoteEditorResult::cancel) {
                     noteEditor.reset();
@@ -102,9 +127,10 @@ int main(int argc, char** argv)
                 createItemSelector = std::make_unique<rcal::CreateItemSelector>();
             } else if ((!keyCode && (key == L'\n' || key == L'\r')) ||
                        (keyCode && key == KEY_ENTER)) {
-                if (const std::string* note = header.selectedNote()) {
-                    addingNote = false;
-                    noteEditor = std::make_unique<rcal::NoteEditor>(*note);
+                const std::string item = header.selectedItemText();
+                if (!item.empty()) {
+                    addingItem = false;
+                    noteEditor = std::make_unique<rcal::NoteEditor>(item);
                 }
             } else {
                 const rcal::InputResult result = header.handleInput(

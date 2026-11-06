@@ -64,7 +64,7 @@ int main() {
 
     rcal::DayInfo mayDayInfo;
     mayDayInfo.workStatus = rcal::WorkStatus::workday;
-    mayDayInfo.notes.push_back("Planlegg møte");
+    mayDayInfo.notes.push_back({"", "Planlegg møte"});
     mayDayInfo.taskCount = 3;
     mayDayInfo.eventCount = 1;
     holidays.setDayInfo({2024, 5, 1}, mayDayInfo);
@@ -127,6 +127,25 @@ int main() {
     holidays.updateSelectedNote("");
     assert(holidays.dayInfo({2024, 5, 3}) == nullptr);
 
+    holidays.addTask({2024, 5, 3}, "Send rapport");
+    assert(holidays.infoIndicator({2024, 5, 3})[3] == '1');
+    assert(holidays.selectedItemType() == rcal::DayItemType::task);
+    assert(holidays.selectedItemText() == "Send rapport");
+    assert(holidays.handleInput('x', inputWindow) == rcal::InputResult::redraw);
+    assert(holidays.dayInfo({2024, 5, 3})->tasks[0].completed);
+    holidays.addEvent({2024, 5, 3}, "09:30 Planleggingsmøte");
+    assert(holidays.infoIndicator({2024, 5, 3})[4] == 'E');
+    assert(holidays.selectedItemType() == rcal::DayItemType::event);
+    assert(holidays.selectedItemText() == "09:30 Planleggingsmøte");
+    holidays.updateSelectedItem("10:00 Endret møte");
+    assert(holidays.dayInfo({2024, 5, 3})->events[0].time == "10:00");
+    holidays.moveNoteSelection(-1);
+    assert(holidays.selectedItemType() == rcal::DayItemType::task);
+    holidays.updateSelectedItem("");
+    holidays.moveNoteSelection(1);
+    holidays.updateSelectedItem("");
+    assert(holidays.dayInfo({2024, 5, 3}) == nullptr);
+
     rcal::NoteEditor noteEditor("Hei");
     noteEditor.handleInput(L' ', false);
     noteEditor.handleInput(L'ø', false);
@@ -142,7 +161,9 @@ int main() {
     assert(createSelector.selectedItem() == 0);
     createSelector.handleInput(KEY_DOWN);
     assert(createSelector.selectedItem() == 1);
-    assert(createSelector.handleInput(KEY_ENTER) == rcal::CreateItemResult::editing);
+    assert(createSelector.handleInput(KEY_ENTER) == rcal::CreateItemResult::createTask);
+    createSelector.handleInput(KEY_DOWN);
+    assert(createSelector.handleInput(KEY_ENTER) == rcal::CreateItemResult::createEvent);
     createSelector.handleInput('n');
     assert(createSelector.handleInput(KEY_ENTER) == rcal::CreateItemResult::createNote);
     assert(rcal::CreateItemSelector{}.handleInput(27) == rcal::CreateItemResult::cancel);
@@ -150,6 +171,7 @@ int main() {
     const auto configured = rcal::RCalHeaderFramework::fromConfigFile(
         std::string(RCAL_SOURCE_DIR) + "/config/rcal.conf.example");
     assert(configured.options().bufferDays == 90);
+    assert(configured.options().dataFile.empty());
     assert(configured.options().rebuildThresholdDays == 30);
     assert(configured.colors().weekend.foreground == "red");
     assert(configured.colors().currentDay.background == "yellow");

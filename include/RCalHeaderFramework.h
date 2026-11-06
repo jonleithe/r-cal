@@ -1,8 +1,11 @@
 #pragma once
 
+#include "CalendarTypes.h"
+
 #include <array>
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -11,33 +14,7 @@ typedef struct _win_st WINDOW;
 
 namespace rcal{
 
-
-
-struct Date{
-    int year        = 1970;
-    unsigned month  = 1;
-    unsigned day    = 1;
-};
-
-
-
-enum class WorkStatus{
-    unspecified,
-    workday,
-    travelling,
-    outOfOfficeWorking,
-    compensatoryLeave,
-    vacation
-};
-
-
-
-struct DayInfo{
-    WorkStatus workStatus = WorkStatus::unspecified;
-    std::vector<std::string> notes;
-    unsigned taskCount = 0;
-    unsigned eventCount = 0;
-};
+class CalendarStore;
 
 
 
@@ -82,6 +59,7 @@ struct HeaderOptions{
     unsigned cellWidth = 5;
     bool showGrid = true;
     std::string holidayCountry = "NO";
+    std::string dataFile;
 
     std::array<std::string, 12> monthNames{{
         "January", "February", "March", "April", "May", "June",
@@ -121,6 +99,12 @@ enum class InputResult{
     quit
 };
 
+enum class DayItemType {
+    note,
+    task,
+    event
+};
+
 
 
 class RCalHeaderFramework{
@@ -141,15 +125,24 @@ public:
     const DayInfo* dayInfo(Date date) const noexcept;
     const std::string* selectedNote() const noexcept;
     std::size_t selectedNoteIndex() const noexcept;
+    DayItemType selectedItemType() const noexcept;
+    std::size_t selectedItemIndex() const noexcept;
+    std::size_t selectedItemFlatIndex() const noexcept;
+    std::string selectedItemText() const;
     std::string infoIndicator(Date date) const;
     std::string infoDescription(Date date) const;
 
     void setOptions(HeaderOptions options);
     void setColors(HeaderColors colors);
+    void setCalendarStore(std::shared_ptr<CalendarStore> store);
     void setDayInfo(Date date, DayInfo info);
     void addNote(Date date, std::string note);
+    void addTask(Date date, std::string task);
+    void addEvent(Date date, std::string event);
     void updateSelectedNote(std::string note);
+    void updateSelectedItem(std::string text);
     void moveNoteSelection(int rows);
+    void toggleSelectedTask();
     bool removeDayInfo(Date date);
     void toggleSelectedWorkStatus(WorkStatus status);
     void clearSelectedWorkStatus();
@@ -167,16 +160,24 @@ private:
     void ensureViewport(WINDOW* window, int left);
     void rebuildBufferedTimeline(Date selected, std::size_t visibleDays,
                                  std::size_t selectedOffset);
+    void loadDayInfo(Date date);
+    void loadTimelineDayInformation();
+    void discardEmptyDayInfo(Date date);
+    std::size_t itemCount(const DayInfo& info) const noexcept;
+    std::size_t selectedFlatIndex(const DayInfo& info) const noexcept;
+    void selectFlatIndex(const DayInfo& info, std::size_t index) noexcept;
 
     HeaderOptions options_;
     HeaderColors colors_;
     std::vector<TimelineDay> timeline_;
     std::map<long long, DayInfo> dayInformation_;
+    std::shared_ptr<CalendarStore> calendarStore_;
     Date selectedDate_;
     std::size_t selectedDayIndex_ = 0;
     std::size_t firstVisibleDay_ = 0;
     std::size_t visibleDayCount_ = 0;
-    std::size_t selectedNoteIndex_ = 0;
+    DayItemType selectedItemType_ = DayItemType::note;
+    std::size_t selectedItemIndex_ = 0;
     bool viewportInitialized_ = false;
 };
 
